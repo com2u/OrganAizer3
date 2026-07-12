@@ -1,0 +1,25 @@
+# Explicit project name so this stack stays isolated from the pre-existing
+# "organaizer" production stack on the server (avoids orphan-container clashes).
+name: terminlandschaft
+
+services:
+  organaizer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: organaizer:latest
+    container_name: OrganAIzer
+    restart: unless-stopped
+    # All system configuration comes from the .env file on the host
+    env_file:
+      - .env
+    ports:
+      # Host:Container - both driven by WEB_PORT from .env
+      - "${WEB_PORT:-4815}:${WEB_PORT:-4815}"
+    volumes:
+      # Database & imported data live on the host and are mounted in
+      - ./data:/app/data
+      # Configuration lives on the host and is mounted in (read-only)
+      - ./.env:/app/.env:ro
+      # Persist logs on the host
+      - ./log.txt:/app/log.txt
