@@ -1,5 +1,6 @@
 """REST API routes for Terminlandschaft."""
 
+import json
 import logging
 import os
 import tempfile
@@ -7,7 +8,8 @@ import tempfile
 from flask import Blueprint, g, jsonify, request, send_file
 
 from backend import auth
-from backend.config import DB_PATH
+from backend.api.logging_middleware import clear_log_entries, get_log_entries
+from backend.config import CONFIG_PATH, DB_PATH
 from backend.db.sqlite_adapter import SQLiteAdapter
 
 logger = logging.getLogger(__name__)
@@ -331,3 +333,115 @@ def export_data():
     except Exception as e:
         logger.exception("Export failed")
         return jsonify({"error": str(e)}), 500
+
+
+# ===== Logs API =====
+
+
+@api_bp.route("/logs", methods=["GET"])
+def get_logs():
+    """Return recent backend log entries for the Settings logging panel.
+
+    Query params:
+        since_id: only return entries with id > since_id (for polling)
+    """
+    since_id = request.args.get("since_id", 0, type=int)
+    entries = get_log_entries(since_id)
+    return jsonify({"entries": entries})
+
+
+@api_bp.route("/logs/clear", methods=["POST"])
+def clear_logs():
+    """Clear the in-memory log buffer."""
+    clear_log_entries()
+    return jsonify({"status": "ok"})
+
+
+# ===== Config API =====
+
+_CONFIG_DEFAULTS = {
+    "tts_auto_play": True,
+    "tts_auto_download": False,
+    "youtube_default_format": "audio",
+    "youtube_default_quality": "medium",
+    "bilder_auto_show": True,
+    "bilder_auto_download": False,
+    "bilder_default_style": "realistic",
+    "bilder_default_quality": "hd",
+    "ocr_auto_extract": True,
+    "ocr_default_language": "de",
+    "obsidian_vault_path": "/vault/obsidian",
+    "obsidian_api_url": "http://localhost:8090",
+    "hermes_api_url": "http://localhost:8080",
+}
+
+_CONFIG_TYPES = {
+    "tts_auto_play": bool,
+    "tts_auto_download": bool,
+    "youtube_default_format": str,
+    "youtube_default_quality": str,
+    "bilder_auto_show": bool,
+    "bilder_auto_download": bool,
+    "bilder_default_style": str,
+    "bilder_default_quality": str,
+    "ocr_auto_extract": bool,
+    "ocr_default_language": str,
+    "obsidian_vault_path": str,
+    "obsidian_api_url": str,
+    "hermes_api_url": str,
+}
+
+
+def _read_config() -> dict:
+    """Read persisted UI configuration, falling back to safe defaults."""
+    try:
+        with open(CONFIG_PATH, encoding="utf-8") as config_file:
+            stored = json.load(config_file)
+        if not isinstance(stored, dict):
+            stored = {}
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        stored = {}
+    return {**_CONFIG_DEFAULTS, **{
+        key: value for key, value in stored.items()
+        if key in _CONFIG_TYPES and isinstance(value, _CONFIG_TYPES[key])
+    }}
+
+
+def _write_config(config: dict) -> None:
+    """Atomically persist configuration below the host-mounted data folder."""
+    os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
+    directory = os.path.dirname(CONFIG_PATH) or "."
+    with tempfile.NamedTemporaryFile(
+        mode="w", encoding="utf-8", dir=directory, delete=False
+    ) as config_file:
+        json.dump(config, config_file, ensure_ascii=False, indent=2)
+        config_file.write("\n")
+        temporary_path = config_file.name
+    os.replace(temporary_path, CONFIG_PATH)
+
+
+@api_bp.route("/config", methods=["GET"])
+def get_config():
+    """Return persisted configuration merged with current defaults."""
+    return jsonify(_read_config())
+
+
+@api_bp.route("/config", methods=["POST"])
+def save_config():
+    """Validate and persist the supported UI configuration fields."""
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return jsonify({"error": "JSON object required"}), 400
+    invalid = [
+        key for key, value in body.items()
+        if key not in _CONFIG_TYPES or not isinstance(value, _CONFIG_TYPES[key])
+    ]
+    if invalid:
+        return jsonify({"error": "Invalid configuration fields", "fields": invalid}), 400
+    config = {**_read_config(), **body}
+    try:
+        _write_config(config)
+    except OSError:
+        logger.exception("Configuration save failed")
+        return jsonify({"error": "Configuration could not be saved"}), 500
+    return jsonify(config)

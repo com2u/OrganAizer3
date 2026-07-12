@@ -7,6 +7,7 @@ from flask import Flask, send_file
 from flask_cors import CORS
 
 from backend.api.routes import api_bp
+from backend.api.logging_middleware import register_logging_middleware
 from backend.config import (
     CORS_ORIGINS,
     FLASK_DEBUG,
@@ -23,6 +24,9 @@ def create_app() -> Flask:
     """Create and configure the Flask application."""
     app = Flask(__name__, static_folder="../frontend/dist", static_url_path="")
     CORS(app, origins=CORS_ORIGINS, supports_credentials=True)
+
+    # Register structured request logging middleware
+    register_logging_middleware(app)
 
     app.register_blueprint(api_bp, url_prefix="/api")
 

@@ -18,12 +18,19 @@ Alle Farben und Abstände werden über CSS Custom Properties (`--var`) definiert
 | `--bg-hover` | `#3f3f46` | `#e4e4e7` | Hover-Zustand |
 | `--bg-active` | `#52525b` | `#d4d4d8` | Aktiver Zustand |
 | `--border` | `#27272a` | `#e4e4e7` | Standard-Rahmen |
+| `--border-subtle` | `#1f1f23` | `#f4f4f5` | Subtile Trennlinien |
+| `--border-hover` | `#3f3f46` | `#d4d4d8` | Hover-Rahmen |
 | `--text-primary` | `#fafafa` | `#09090b` | Primärtext |
 | `--text-secondary` | `#a1a1aa` | `#52525b` | Sekundärtext |
 | `--text-tertiary` | `#71717a` | `#a1a1aa` | Hints, Labels |
+| `--text-inverse` | `#09090b` | `#fafafa` | Invertierter Text |
 | `--accent` | `#fafafa` | `#18181b` | Akzent (Buttons, Active-States) |
+| `--accent-hover` | `#e4e4e7` | `#27272a` | Akzent Hover |
+| `--accent-muted` | `#27272a` | `#f4f4f5` | Gedämpfter Akzent |
 | `--success` | `#22c55e` | `#16a34a` | Erfolgsmeldungen |
 | `--error` | `#ef4444` | `#dc2626` | Fehlermeldungen |
+| `--warning` | `#f59e0b` | `#d97706` | Warnungen |
+| `--info` | `#3b82f6` | `#2563eb` | Informationen |
 
 ### Radien
 
@@ -65,9 +72,10 @@ Alle Farben und Abstände werden über CSS Custom Properties (`--var`) definiert
 Verwendete Icons (Auswahl):
 - Navigation: `Bot`, `Calendar`, `CheckSquare`, `Mic`, `Settings`, `LogOut`
 - Actions: `Play`, `Download`, `Upload`, `Search`, `X`, `ArrowLeft`, `ArrowRight`
-- Status: `Loader2`, `Check`, `ExternalLink`
+- Status: `Loader2`, `Check`, `ExternalLink`, `AlertTriangle`, `RefreshCw`
 - Features: `Sparkles`, `Clock`, `Tag`, `FolderOpen`, `ZoomIn`
-- Settings: `Palette`, `Sun`, `Moon`, `Volume2`, `Image`, `ScanText`, `BookOpen`
+- Settings: `Palette`, `Sun`, `Moon`, `Volume2`, `Image`, `ScanText`, `BookOpen`, `ScrollText`
+- Logging: `Trash2`, `Filter`, `RefreshCw`, `Download`
 
 ## Layout
 
@@ -94,7 +102,7 @@ Verwendete Icons (Auswahl):
 |---|---|---|
 | Sidebar | `Sidebar.tsx` | Navigation, User-Info, Settings/Logout |
 | LoginScreen | `LoginScreen.tsx` | Auth-Formular |
-| AssistentView | `AssistentView.tsx` | OpenWebUI iframe (rahmenlos) |
+| AssistentView | `AssistentView.tsx` | OpenWebUI iframe (rahmenlos) mit Load/Error-States |
 | TermineView | `TermineView.tsx` | Kalender-Orchestrator |
 | WeeklyCalendar | `WeeklyCalendar.tsx` | Wochenkalender-Grid |
 | WeekSelector | `WeekSelector.tsx` | KW 1-4 Buttons |
@@ -105,7 +113,8 @@ Verwendete Icons (Auswahl):
 | SpracheView | `SpracheView.tsx` | TTS, STT, YouTube |
 | BildGeneratorView | `BildGeneratorView.tsx` | KI-Bildgenerierung |
 | WissenView | `WissenView.tsx` | Obsidian-Suche |
-| ConfigView | `ConfigView.tsx` | Settings mit Appearance-Tab (Theme/Sprache) |
+| ConfigView | `ConfigView.tsx` | Settings mit Appearance/Logs-Tabs |
+| LoggingPanel | `LoggingPanel.tsx` | Frontend/Backend Log-Anzeige |
 
 ## Theme-Konzept
 
@@ -113,6 +122,7 @@ Verwendete Icons (Auswahl):
 - **Umschaltung:** In Settings > Appearance via segmentierte Buttons
 - **Implementierung:** CSS Custom Properties mit `[data-theme]` Attribut auf `<html>`
 - **Context:** `ThemeContext.tsx` stellt `theme`, `lang`, `setTheme`, `setLang`, `t()` bereit
+- **Light-Mode-Label:** "Bright" wird intern als `light` gespeichert
 
 ## Lokalisierung
 
@@ -121,6 +131,66 @@ Verwendete Icons (Auswahl):
 - **Funktion:** `t(key)` gibt den Text in der aktiven Sprache zurück
 - **Fallback:** Gibt den Key selbst zurück, wenn kein Eintrag existiert
 - **Alle UI-Texte** der überarbeiteten Bereiche sind übersetzt
+
+## Logging-Architektur
+
+### Frontend (`src/logging.ts`)
+
+- **Ring Buffer:** 300 Einträge im Speicher, subscribebare Updates
+- **Log-Levels:** `debug`, `info`, `warn`, `error`
+- **Log-Sources:** `api`, `app`, `iframe`, `error`
+- **Redaktion:** Sensible Felder (password, token, secret, authorization, cookie, api_key) werden automatisch mit `***redacted***` ersetzt
+- **Global Error Handlers:** `window.onerror` und `unhandledrejection` werden automatisch erfasst
+- **API-Integration:** Jeder `apiFetch()`-Aufruf loggt automatisch Method, Path, Status und Duration
+- **Console Output:** Alle Einträge werden zusätzlich (redacted) in die Browser-Konsole geschrieben
+
+### Backend (`backend/api/logging_middleware.py`)
+
+- **Middleware:** Flask `before_request` / `after_request` Hooks
+- **Structured Logging:** Jeder Request wird mit Timestamp, Method, Path, Status, Duration, User und Remote-Addr geloggt
+- **Ring Buffer:** 500 Einträge im Speicher, thread-safe (threading.Lock)
+- **Redaktion:** Headers (Authorization, Cookie, X-API-Key) werden geschwärzt; Body-Felder mit sensitiven Namen werden geschwärzt
+- **API Endpoints:**
+  - `GET /api/logs?since_id=N` — Polling-Endpunkt für das Frontend
+  - `POST /api/logs/clear` — Löscht den Ring Buffer
+- **File Logging:** Zusätzlich in `log.txt` über Python `logging` Modul
+
+### Settings-Panel (Logs-Tab)
+
+- **Frontend-Tab:** Zeigt Entries aus `src/logging.ts` in Echtzeit (subscribe-basiert)
+- **Backend-Tab:** Pollt alle 3 Sekunden `GET /api/logs?since_id=...`
+- **Controls:**
+  - Level-Filter (All/Errors/Warnings/Info/Debug) — nur Frontend
+  - Refresh-Button
+  - Export-Button (JSON-Download)
+  - Clear-Button (löscht Frontend-Buffer bzw. POST `/api/logs/clear`)
+  - Auto-Scroll-Toggle
+- **Darstellung:** Monospace-Tabelle mit farbigen Level-Badges
+
+## Interaktionsmuster
+
+### OpenWebUI-Iframe
+
+- **Laden:** Overlay mit Spinner, Status-Dot gelb/pulsierend
+- **Bereit:** Overlay entfernt, Status-Dot grün, "Verbunden"
+- **Fehler:** Overlay mit AlertTriangle-Icon, Fehlermeldung, Retry-Button, Status-Dot rot
+- **Diagnostik:** Load-Events und -Dauer werden in das Frontend-Log geschrieben
+- **Kein Rahmen:** `border: none` auf dem iframe, keine umgebenden Borders
+
+### Buttons
+
+- `.btn-primary` — Gefüllt mit `--accent`, weiße Schrift
+- `.btn-secondary` — Border, transparent, für sekundäre Aktionen
+- `.btn-ghost` — Kein Border, minimalistisch
+- `.icon-btn` — 32x32, für Icon-only Buttons
+- `.icon-btn.danger` — Wird rot bei Hover
+
+### Formulare
+
+- Inputs/Selects: `--bg-base` Background, `--border` Rahmen, `--accent` Focus
+- Labels: 12px, 600 weight, `--text-secondary`
+- Placeholder: `--text-tertiary`
+- Toggle/Switch: Custom CSS-only Toggle mit Slider-Animation
 
 ## Regeln für spätere Erweiterungen
 
@@ -134,3 +204,6 @@ Verwendete Icons (Auswahl):
 8. **Focus-States:** `:focus-visible` mit `outline: 2px solid var(--accent)`
 9. **Keine Rahmen** um den OpenWebUI-iframe
 10. **Buttons:** Verwende `.btn-primary`, `.btn-secondary`, `.btn-ghost`, `.icon-btn`
+11. **Logging:** Neue Features sollten relevante Events über `logApp()` loggen
+12. **Sensible Daten:** Niemals Tokens/Passwörter in Logs — Redaktion ist automatisch, aber bei manuellen Logs trotzdem beachten
+13. **Backend-Routes:** Werden automatisch durch die Middleware geloggt, kein manuelles Logging nötig

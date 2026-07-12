@@ -1,6 +1,6 @@
 import { User } from '../types'
 import { useTheme } from '../ThemeContext'
-import { Bot, Calendar, CheckSquare, Mic, Settings, LogOut } from 'lucide-react'
+import { Bot, Calendar, CheckSquare, Mic, BookOpen, Settings, LogOut } from 'lucide-react'
 
 export type CategoryKey =
   | 'assistent'
@@ -8,7 +8,6 @@ export type CategoryKey =
   | 'aufgaben'
   | 'sprache'
   | 'wissen'
-  | 'bilder'
   | 'settings'
 
 interface NavDef {
@@ -23,6 +22,7 @@ const CATEGORIES: NavDef[] = [
   { key: 'termine', labelKey: 'nav.termine', hintKey: 'nav.termine.hint', icon: Calendar },
   { key: 'aufgaben', labelKey: 'nav.aufgaben', hintKey: 'nav.aufgaben.hint', icon: CheckSquare },
   { key: 'sprache', labelKey: 'nav.sprache', hintKey: 'nav.sprache.hint', icon: Mic },
+  { key: 'wissen', labelKey: 'nav.wissen', hintKey: 'nav.wissen.hint', icon: BookOpen },
 ]
 
 interface SidebarProps {
@@ -47,7 +47,7 @@ export default function Sidebar({ active, onSelect, user, onLogout }: SidebarPro
       <div className="sidebar-brand">
         <span className="brand-mark">OA</span>
         <span className="brand-text">
-          <strong>OrganAIzer</strong>
+          <strong>OrganAIzer <small className="brand-version">v0.1.0</small></strong>
           <small>AI Workspace</small>
         </span>
       </div>

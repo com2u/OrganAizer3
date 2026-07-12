@@ -65,6 +65,9 @@ OPENWEBUI_URL = os.environ.get(
 DB_PATH = _resolve_path(
     os.environ.get("DB_PATH", os.path.join("data", "terminlandschaft.db"))
 )
+CONFIG_PATH = _resolve_path(
+    os.environ.get("CONFIG_PATH", os.path.join("data", "organaizer-config.json"))
+)
 
 # Logging
 LOG_LEVEL = getattr(logging, os.environ.get("LOG_LEVEL", "DEBUG").upper(), logging.DEBUG)

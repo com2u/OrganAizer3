@@ -1,4 +1,5 @@
 import { Appointment, TerminDetail, Bereich, Usergruppe, Intervall, User } from './types'
+import { logApi } from './logging'
 
 // Configurable at build time via VITE_API_BASE.
 // Defaults to the relative '/api' (frontend served by the Flask backend).
@@ -24,12 +25,15 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
-/** fetch wrapper that adds the auth header and reacts to expired sessions. */
+/** fetch wrapper that adds the auth header, logs requests, and reacts to expired sessions. */
 async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const start = performance.now()
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: { ...(init.headers as Record<string, string>), ...authHeaders() },
   })
+  const duration = performance.now() - start
+  logApi(init.method || 'GET', path, res.status, duration)
   if (res.status === 401) {
     clearToken()
     window.dispatchEvent(new Event('auth:expired'))
@@ -61,6 +65,25 @@ export async function fetchMe(): Promise<User> {
 
 export function logout(): void {
   clearToken()
+}
+
+export async function fetchConfig(): Promise<Record<string, unknown>> {
+  const res = await apiFetch('/config')
+  if (!res.ok) throw new Error('Failed to fetch configuration')
+  return res.json()
+}
+
+export async function saveConfig(config: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const res = await apiFetch('/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+  })
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}))
+    throw new Error(error.error || 'Failed to save configuration')
+  }
+  return res.json()
 }
 
 // ===== Data =====

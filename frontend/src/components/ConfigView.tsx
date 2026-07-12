@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useTheme } from '../ThemeContext'
-import { Settings, Volume2, Download, Image, ScanText, BookOpen, Palette, Sun, Moon, Save, Check, Loader2 } from 'lucide-react'
+import { fetchConfig, saveConfig } from '../api'
+import { Settings, Volume2, Download, Image, ScanText, BookOpen, Palette, Sun, Moon, Save, Check, Loader2, ScrollText } from 'lucide-react'
+import LoggingPanel from './LoggingPanel'
 
 interface AppConfig {
   tts_auto_play: boolean
@@ -18,7 +20,7 @@ interface AppConfig {
   hermes_api_url: string
 }
 
-type TabKey = 'appearance' | 'general' | 'tts' | 'youtube' | 'bilder' | 'ocr' | 'obsidian'
+type TabKey = 'appearance' | 'general' | 'tts' | 'youtube' | 'bilder' | 'ocr' | 'obsidian' | 'logs'
 
 export default function ConfigView() {
   const { t, theme, lang, setTheme, setLang } = useTheme()
@@ -46,26 +48,18 @@ export default function ConfigView() {
 
   const loadConfig = async () => {
     try {
-      const response = await fetch('/api/config')
-      if (response.ok) {
-        const data = await response.json()
-        setConfig(prev => ({ ...prev, ...data }))
-      }
+      const data = await fetchConfig()
+      setConfig(prev => ({ ...prev, ...data }))
     } catch { /* defaults */ } finally { setLoading(false) }
   }
 
   const handleSave = async () => {
     setSaving(true)
     try {
-      const response = await fetch('/api/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
-      })
-      if (response.ok) {
-        setSaved(true)
-        setTimeout(() => setSaved(false), 3000)
-      }
+      const savedConfig = await saveConfig({ ...config })
+      setConfig(prev => ({ ...prev, ...savedConfig }))
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
     } catch { alert(t('config.saveError')) } finally { setSaving(false) }
   }
 
@@ -82,6 +76,7 @@ export default function ConfigView() {
     { key: 'bilder', icon: Image, labelKey: 'config.bilder' },
     { key: 'ocr', icon: ScanText, labelKey: 'config.ocr' },
     { key: 'obsidian', icon: BookOpen, labelKey: 'config.obsidian' },
+    { key: 'logs', icon: ScrollText, labelKey: 'config.logs' },
   ]
 
   if (loading) {
@@ -270,6 +265,14 @@ export default function ConfigView() {
             <div className="info-box">
               <p>{t('config.obsidian.info')}</p>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'logs' && (
+          <div className="config-section config-section-logs">
+            <h3><ScrollText size={18} /> {t('config.logs.title')}</h3>
+            <p className="view-sub" style={{ marginBottom: 16 }}>{t('config.logs.desc')}</p>
+            <LoggingPanel />
           </div>
         )}
       </div>

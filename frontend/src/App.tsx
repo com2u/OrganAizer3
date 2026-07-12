@@ -4,6 +4,7 @@ import TermineView from './components/TermineView'
 import AssistentView from './components/AssistentView'
 import AufgabenView from './components/AufgabenView'
 import SpracheView from './components/SpracheView'
+import WissenView from './components/WissenView'
 import ConfigView from './components/ConfigView'
 import LoginScreen from './components/LoginScreen'
 import { fetchMe, getToken, logout as apiLogout } from './api'
@@ -64,6 +65,7 @@ function App() {
         {category === 'termine' && <TermineView />}
         {category === 'aufgaben' && <AufgabenView />}
         {category === 'sprache' && <SpracheView />}
+        {category === 'wissen' && <WissenView />}
         {category === 'settings' && <ConfigView />}
       </main>
     </div>

@@ -34,6 +34,10 @@ const T: Translations = {
   'nav.aufgaben.hint': { de: 'Workflows · Wissen · Bilder', en: 'Workflows · Knowledge · Images' },
   'nav.sprache': { de: 'Sprache', en: 'Speech' },
   'nav.sprache.hint': { de: 'TTS · STT · Downloads', en: 'TTS · STT · Downloads' },
+  'nav.wissen': { de: 'Wissen', en: 'Knowledge' },
+  'nav.wissen.hint': { de: 'Obsidian-Suche', en: 'Obsidian search' },
+  'nav.bilder': { de: 'Bilder', en: 'Images' },
+  'nav.bilder.hint': { de: 'KI-Bildgenerator', en: 'AI image generator' },
   'nav.settings': { de: 'Einstellungen', en: 'Settings' },
 
   // Login
@@ -55,6 +59,11 @@ const T: Translations = {
   'assistant.title': { de: 'Hermes Assistent', en: 'Hermes Assistant' },
   'assistant.sub': { de: 'Dein KI-Arbeitsplatz mit OpenWebUI', en: 'Your AI workspace with OpenWebUI' },
   'assistant.connected': { de: 'Verbunden', en: 'Connected' },
+  'assistant.error': { de: 'Fehler', en: 'Error' },
+  'assistant.loading': { de: 'OpenWebUI wird geladen\u2026', en: 'Loading OpenWebUI\u2026' },
+  'assistant.loadError': { de: 'OpenWebUI konnte nicht geladen werden', en: 'Failed to load OpenWebUI' },
+  'assistant.loadErrorHint': { de: 'Pr\u00fcfe die Netzwerkverbindung und ob der OpenWebUI-Server erreichbar ist. Die Konsole zeigt Details.', en: 'Check your network connection and whether the OpenWebUI server is reachable. See console for details.' },
+  'assistant.retry': { de: 'Erneut versuchen', en: 'Retry' },
   'assistant.open': { de: 'OpenWebUI \u00f6ffnen', en: 'Open OpenWebUI' },
   'assistant.chat': { de: 'Chat mit Hermes', en: 'Chat with Hermes' },
   'assistant.chatHint': { de: 'Dateien, Bilder und Audio direkt im Chat', en: 'Files, images and audio directly in chat' },
@@ -354,6 +363,32 @@ const T: Translations = {
 
   // Misc
   'loading': { de: 'Laden\u2026', en: 'Loading\u2026' },
+
+  // Logging Panel
+  'config.logs': { de: 'Protokoll', en: 'Logs' },
+  'config.logs.title': { de: 'System-Protokoll', en: 'System Logs' },
+  'config.logs.desc': { de: 'Frontend- und Backend-Protokolleinträge mit sicherer Schwärzung sensibler Daten.', en: 'Frontend and backend log entries with safe redaction of sensitive data.' },
+  'logs.frontend': { de: 'Frontend', en: 'Frontend' },
+  'logs.backend': { de: 'Backend', en: 'Backend' },
+  'logs.all': { de: 'Alle', en: 'All' },
+  'logs.errors': { de: 'Fehler', en: 'Errors' },
+  'logs.warnings': { de: 'Warnungen', en: 'Warnings' },
+  'logs.info': { de: 'Info', en: 'Info' },
+  'logs.debug': { de: 'Debug', en: 'Debug' },
+  'logs.refresh': { de: 'Aktualisieren', en: 'Refresh' },
+  'logs.export': { de: 'Exportieren', en: 'Export' },
+  'logs.clear': { de: 'Löschen', en: 'Clear' },
+  'logs.autoscroll': { de: 'Auto-Scroll', en: 'Auto-scroll' },
+  'logs.noEntries': { de: 'Keine Protokolleinträge vorhanden', en: 'No log entries available' },
+  'logs.time': { de: 'Zeit', en: 'Time' },
+  'logs.level': { de: 'Level', en: 'Level' },
+  'logs.source': { de: 'Quelle', en: 'Source' },
+  'logs.message': { de: 'Nachricht', en: 'Message' },
+  'logs.method': { de: 'Methode', en: 'Method' },
+  'logs.path': { de: 'Pfad', en: 'Path' },
+  'logs.status': { de: 'Status', en: 'Status' },
+  'logs.duration': { de: 'Dauer', en: 'Duration' },
+  'logs.user': { de: 'Benutzer', en: 'User' },
 }
 
 export function t(key: string, lang: Lang): string {
