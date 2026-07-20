@@ -1,13 +1,18 @@
 import { User } from '../types'
 import { useTheme } from '../ThemeContext'
-import { Bot, Calendar, CheckSquare, Mic, BookOpen, Settings, LogOut } from 'lucide-react'
+import { Bot, Calendar, CheckSquare, Mic, BookOpen, Phone, Settings, LogOut, Users, ClipboardList, Cable, Plug } from 'lucide-react'
 
 export type CategoryKey =
   | 'assistent'
   | 'termine'
+  | 'ressourcen'
+  | 'planung'
   | 'aufgaben'
   | 'sprache'
   | 'wissen'
+  | 'telefonie'
+  | 'ki_verbindung'
+  | 'verbindungen'
   | 'settings'
 
 interface NavDef {
@@ -23,6 +28,11 @@ const CATEGORIES: NavDef[] = [
   { key: 'aufgaben', labelKey: 'nav.aufgaben', hintKey: 'nav.aufgaben.hint', icon: CheckSquare },
   { key: 'sprache', labelKey: 'nav.sprache', hintKey: 'nav.sprache.hint', icon: Mic },
   { key: 'wissen', labelKey: 'nav.wissen', hintKey: 'nav.wissen.hint', icon: BookOpen },
+  { key: 'ressourcen', labelKey: 'nav.ressourcen', hintKey: 'nav.ressourcen.hint', icon: Users },
+  { key: 'planung', labelKey: 'nav.planung', hintKey: 'nav.planung.hint', icon: ClipboardList },
+  { key: 'telefonie', labelKey: 'nav.telefonie', hintKey: 'nav.telefonie.hint', icon: Phone },
+  { key: 'verbindungen', labelKey: 'nav.externe_verbindungen', hintKey: 'nav.externe_verbindungen.hint', icon: Plug },
+  { key: 'ki_verbindung', labelKey: 'nav.ki_verbindung', hintKey: 'nav.ki_verbindung.hint', icon: Cable },
 ]
 
 interface SidebarProps {
@@ -45,9 +55,9 @@ export default function Sidebar({ active, onSelect, user, onLogout }: SidebarPro
   return (
     <nav className="sidebar">
       <div className="sidebar-brand">
-        <span className="brand-mark">OA</span>
+        <img src="/organaizer.png" alt="OrganAIzer" className="brand-mark" />
         <span className="brand-text">
-          <strong>OrganAIzer <small className="brand-version">v0.1.0</small></strong>
+          <strong>OrganAIzer <small className="brand-version">v0.1.5</small></strong>
           <small>AI Workspace</small>
         </span>
       </div>

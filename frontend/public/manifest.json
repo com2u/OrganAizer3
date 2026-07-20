@@ -1,0 +1,21 @@
+{
+  "short_name": "OrganAIzer",
+  "name": "OrganAIzer - AI-powered Organization",
+  "icons": [
+    {
+      "src": "organaizer.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    },
+    {
+      "src": "organaizer.png",
+      "type": "image/png",
+      "sizes": "192x192 512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#000000",
+  "background_color": "#ffffff",
+  "description": "AI-powered organization and task management application"
+}

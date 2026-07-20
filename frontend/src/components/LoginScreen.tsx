@@ -2,12 +2,14 @@ import { useState } from 'react'
 import { login } from '../api'
 import { User } from '../types'
 import { useTheme } from '../ThemeContext'
+import { ArrowLeft } from 'lucide-react'
 
 interface LoginScreenProps {
   onLogin: (user: User) => void
+  onBack?: () => void
 }
 
-export default function LoginScreen({ onLogin }: LoginScreenProps) {
+export default function LoginScreen({ onLogin, onBack }: LoginScreenProps) {
   const { t } = useTheme()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -31,8 +33,14 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
   return (
     <div className="login-screen">
       <form className="login-card" onSubmit={handleSubmit}>
+        {onBack && (
+          <button type="button" className="login-back" onClick={onBack}>
+            <ArrowLeft size={16} />
+            {t('landing.back')}
+          </button>
+        )}
         <div className="login-brand">
-          <span className="brand-mark">OA</span>
+          <img src="/organaizer.png" alt="OrganAIzer" className="brand-mark" />
           <div className="brand-text">
             <strong>OrganAIzer</strong>
             <small>AI Workspace</small>

@@ -23,5 +23,5 @@ echo "Starting server on http://${WEB_HOST}:${WEB_PORT}"
 exec gunicorn \
     --bind "${WEB_HOST}:${WEB_PORT}" \
     --workers "${GUNICORN_WORKERS:-2}" \
-    --timeout "${GUNICORN_TIMEOUT:-120}" \
+    --timeout "${GUNICORN_TIMEOUT:-600}" \
     "backend.server:create_app()"

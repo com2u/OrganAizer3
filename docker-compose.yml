@@ -23,3 +23,33 @@ services:
       - ./.env:/app/.env:ro
       # Persist logs on the host
       - ./log.txt:/app/log.txt
+      # Obsidian vault directory (all user vaults; access is enforced per-user in the app)
+      # SECURITY: Do NOT mount to /app/obsidian/<user> – user isolation is enforced
+      # by the application via OBSIDIAN_ROOT + authenticated email containment check.
+      - /home/hermes/obsidian:/app/obsidian
+
+  # ===== n8n – Workflow Automation =====
+  # Local n8n instance for the OrganAIzer n8n integration.
+  # Auto-starts with the stack, UI accessible on port 5678.
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    environment:
+      # Run in "public" mode so the editor is accessible without signup
+      - N8N_RUNNERS_ENABLED=true
+      - N8N_HOST=n8n
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:5678/
+      # Allow iframe embedding from OrganAIzer
+      - N8N_SECURE_COOKIE=false
+      - N8N_EDITOR_BASE_URL=http://localhost:5678
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_PERSONALIZATION_ENABLED=false
+      - N8N_TEMPLATES_ENABLED=false
+    ports:
+      - "5678:5678"
+    volumes:
+      # Persist n8n workflows and credentials on the host
+      - ./n8n_data:/home/node/.n8n

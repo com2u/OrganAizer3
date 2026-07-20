@@ -112,7 +112,7 @@ Verwendete Icons (Auswahl):
 | AufgabenView | `AufgabenView.tsx` | Aufgaben-Hub mit Tool-Karten und Templates |
 | SpracheView | `SpracheView.tsx` | TTS, STT, YouTube |
 | BildGeneratorView | `BildGeneratorView.tsx` | KI-Bildgenerierung |
-| WissenView | `WissenView.tsx` | Obsidian-Suche |
+| WissenView | `WissenView.tsx` | User-isolierte Obsidian-Suche, Navigation, Markdown-Editor, Tags und Änderungsverlauf |
 | ConfigView | `ConfigView.tsx` | Settings mit Appearance/Logs-Tabs |
 | LoggingPanel | `LoggingPanel.tsx` | Frontend/Backend Log-Anzeige |
 
@@ -131,6 +131,10 @@ Verwendete Icons (Auswahl):
 - **Funktion:** `t(key)` gibt den Text in der aktiven Sprache zurück
 - **Fallback:** Gibt den Key selbst zurück, wenn kein Eintrag existiert
 - **Alle UI-Texte** der überarbeiteten Bereiche sind übersetzt
+
+## Wissen / Obsidian UX
+
+Die Wissen-Ansicht verwendet vier Arbeitsbereiche: `Suche` (Volltext oder nur Überschriften), `Navigation` (Vault-Baum und Markdown-Editor), `Tags` (Filter und zugehörige Dokumente) sowie `Zuletzt bearbeitet` (sortierbar nach Änderungs- oder Erstellungsdatum). Lade-, Fehler-, Konflikt- und Speicherzustände sind sichtbar. Auf kleinen Bildschirmen wechselt Navigation zwischen Baum und Editor. Die Oberfläche nutzt Tastaturfokus, semantische Buttons, `aria`-Labels und berücksichtigt Reduced Motion.
 
 ## Logging-Architektur
 
@@ -207,3 +211,37 @@ Verwendete Icons (Auswahl):
 11. **Logging:** Neue Features sollten relevante Events über `logApp()` loggen
 12. **Sensible Daten:** Niemals Tokens/Passwörter in Logs — Redaktion ist automatisch, aber bei manuellen Logs trotzdem beachten
 13. **Backend-Routes:** Werden automatisch durch die Middleware geloggt, kein manuelles Logging nötig
+
+## Landingpage (Public Entry)
+
+### Komposition
+Nicht-authentifizierte Besucher sehen eine öffentliche Produktseite statt nur eines Login-Formulars.
+
+- **Header:** Sticky, compact. OrganAIzer-Branding, Theme-/Language-Toggle, Login (sekundär) und "Zugang anfragen" (primär).
+- **Hero:** Editorialer Split. Links: Eyebrow + Headline + Subtext + zwei CTAs. Rechts: codebasierte Produktvorschau (App-Shell mit Sidebar + Assistent-Mock).
+- **Bento-Story:** Ungleichgewichtiges Grid (1.4fr/1fr + full-width). Vier Module: Termine & Planung, Aufgaben & Ressourcen, KI-Verbindungen, Sprache & Wissen.
+- **Workflow:** Drei Schritte (Sammeln → Strukturieren → Handeln) mit Connectors.
+- **Prinzipien:** Drei Karten (weniger Kontextwechsel, Provider-neutral, eine Arbeitsoberfläche).
+- **Final CTA:** Wiederholung der Hero-CTAs.
+- **Footer:** Branding + Auth-Hinweis.
+
+### Produktvorschau
+React-Komponente `ProductPreview`, die eine miniaturisierte App-Shell rendert (Sidebar mit echten Modulnamen + Assistent-Chat-Mock). Keine Screenshots, keine externen Assets. Klar als Vorschau gekennzeichnet.
+
+### Motion
+- `landingFadeUp` Animation (staggered) bei initialem Rendern.
+- Respektiert `prefers-reduced-motion: reduce`.
+- Hover-Elevationen auf Bento-Zellen und Prinzipien.
+- Keine permanenten Loops.
+
+### Auth-Zustände
+- `user === undefined` → Spinner (Token-Check läuft)
+- `user === null, publicView === 'landing'` → LandingPage
+- `user === null, publicView === 'login'` → LoginScreen (mit "Zurück"-Navigation)
+- `user !== null` → App-Shell (unverändert)
+
+### Zugang anfragen
+Selbstregistrierung bleibt deaktiviert. "Zugang anfragen" öffnet ein barrierearmes `<dialog>`-Formular mit E-Mail-Adresse und Zusatzinformationen. Die Anfrage wird über `POST /api/access-requests` validiert und als offene Anfrage gespeichert; es wird kein Zugang automatisch angelegt und kein Erfolg bei einem Serverfehler vorgetäuscht. Das Backend speichert ausschließlich E-Mail, Zusatzinformationen, Status und Zeitstempel.
+
+### Verbindungsansichten
+Die Ansichten "Verbindungen" und "KI-Verbindungen" verwenden denselben `.view`-/`.view-header`-Rhythmus wie Ressourcen, Planung, Aufgaben, Sprache und Wissen. Titel und Untertitel erhalten dadurch einen eigenen Kopfbereich; Aktionen liegen in den Header-Controls und überdecken keine Texte. Der darunterliegende Bento-Inhalt wird in einem gepolsterten, scrollbaren Body mit sichtbarem Abstand zur Sidebar dargestellt.

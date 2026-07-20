@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useTheme } from '../ThemeContext'
-import { Sparkles, Download, ZoomIn, Clock, Loader2 } from 'lucide-react'
+import { Sparkles, Download, ZoomIn, Clock, Loader2, X } from 'lucide-react'
+import { getToken } from '../api'
 
 interface GenerationConfig {
   prompt: string
@@ -9,6 +10,18 @@ interface GenerationConfig {
   aspectRatio: string
   count: number
   quality: string
+}
+
+const API_BASE = import.meta.env.VITE_API_BASE ?? '/api'
+
+function apiUrl(path: string): string {
+  const cleanPath = path.replace(/^\/api/, '')
+  return `${API_BASE}${cleanPath}`
+}
+
+function authHeader(): Record<string, string> {
+  const token = getToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
 export default function BildGeneratorView() {
@@ -45,20 +58,30 @@ export default function BildGeneratorView() {
   const [generating, setGenerating] = useState(false)
   const [results, setResults] = useState<string[]>([])
   const [history, setHistory] = useState<Array<{ id: string; prompt: string; imageUrl: string; timestamp: string; style: string }>>([])
+  const abortRef = useRef<AbortController | null>(null)
 
   const handleGenerate = async () => {
     if (!config.prompt.trim()) { alert(t('bilder.enterPrompt')); return }
+    abortRef.current = new AbortController()
     setGenerating(true)
     setResults([])
     try {
       const ar = ASPECT_RATIOS.find(r => r.id === config.aspectRatio)
-      const response = await fetch('/api/bilder/generate', {
+      const response = await fetch(apiUrl('/api/bilder/generate'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeader(),
+        },
         body: JSON.stringify({ prompt: config.prompt, negative_prompt: config.negativePrompt, style: config.style, width: ar?.w || 1024, height: ar?.h || 1024, count: config.count, quality: config.quality }),
+        signal: abortRef.current.signal,
       })
-      if (!response.ok) throw new Error('Generation failed')
       const data = await response.json()
+      if (!response.ok) {
+        const errorMsg = data.error || 'Generation failed'
+        alert(errorMsg)
+        return
+      }
       setResults(data.image_urls || [])
       const autoShow = localStorage.getItem('bilder_auto_show') !== 'false'
       if (autoShow && data.image_urls?.length) {
@@ -66,12 +89,27 @@ export default function BildGeneratorView() {
           setHistory(prev => [{ id: Date.now().toString() + Math.random(), prompt: config.prompt, imageUrl: url, timestamp: new Date().toISOString(), style: config.style }, ...prev.slice(0, 49)])
         })
       }
-    } catch {
-      const demoImages = Array.from({ length: config.count }, (_, i) => `https://picsum.photos/1024/1024?random=${Date.now() + i}`)
-      setResults(demoImages)
+      // Save to task history
+      await fetch(apiUrl('/api/tasks/history'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeader(),
+        },
+        body: JSON.stringify({ name: `Bilder: ${config.prompt.slice(0, 50)}`, status: 'Erfolgreich' }),
+      }).catch(() => {})
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') return
+      alert(err instanceof Error ? err.message : 'Bildgenerierung fehlgeschlagen')
     } finally {
       setGenerating(false)
+      abortRef.current = null
     }
+  }
+
+  const handleCancel = () => {
+    abortRef.current?.abort()
+    setGenerating(false)
   }
 
   return (
@@ -90,7 +128,11 @@ export default function BildGeneratorView() {
             <textarea value={config.prompt} onChange={e => setConfig(prev => ({ ...prev, prompt: e.target.value }))} placeholder={t('bilder.promptPlaceholder')} rows={4} />
             <button className="small-btn" onClick={async () => {
               try {
-                const res = await fetch('/api/hermes/improve-prompt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: config.prompt }) })
+                const res = await fetch(apiUrl('/api/hermes/improve-prompt'), {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', ...authHeader() },
+                  body: JSON.stringify({ text: config.prompt }),
+                })
                 const data = await res.json()
                 setConfig(prev => ({ ...prev, prompt: data.improved }))
               } catch {
@@ -146,9 +188,16 @@ export default function BildGeneratorView() {
             </div>
           </div>
 
-          <button className="primary-btn generate-btn" onClick={handleGenerate} disabled={generating || !config.prompt.trim()}>
-            {generating ? <><Loader2 size={14} /> {t('bilder.generating')}</> : <><Sparkles size={14} /> {config.count > 1 ? t('bilder.nImagesPlural').replace('{n}', String(config.count)) : t('bilder.nImages').replace('{n}', '1')} </>}
-          </button>
+          <div className="button-row">
+            <button className="primary-btn generate-btn" onClick={handleGenerate} disabled={generating || !config.prompt.trim()}>
+              {generating ? <><Loader2 size={14} className="spin" /> {t('bilder.generating')}</> : <><Sparkles size={14} /> {config.count > 1 ? t('bilder.nImagesPlural').replace('{n}', String(config.count)) : t('bilder.nImages').replace('{n}', '1')} </>}
+            </button>
+            {generating && (
+              <button className="cancel-btn" onClick={handleCancel}>
+                <X size={14} /> {t('cancel')}
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="results-panel">

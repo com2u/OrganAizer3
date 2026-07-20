@@ -61,6 +61,9 @@ OPENWEBUI_URL = os.environ.get(
     "OPENWEBUI_URL", "https://openwebui.ai-server.org"
 ).rstrip("/")
 
+# Obsidian Vault root (host-mounted directory; container path configured via env)
+OBSIDIAN_ROOT = os.environ.get("OBSIDIAN_ROOT", "/app/obsidian")
+
 # Database
 DB_PATH = _resolve_path(
     os.environ.get("DB_PATH", os.path.join("data", "terminlandschaft.db"))
