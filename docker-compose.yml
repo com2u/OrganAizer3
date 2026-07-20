@@ -27,6 +27,9 @@ services:
       # SECURITY: Do NOT mount to /app/obsidian/<user> – user isolation is enforced
       # by the application via OBSIDIAN_ROOT + authenticated email containment check.
       - /home/hermes/obsidian:/app/obsidian
+    # Reach the host-networked voice stack (voice-web control API on :2300).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   # ===== n8n – Workflow Automation =====
   # Local n8n instance for the OrganAIzer n8n integration.
@@ -53,3 +56,81 @@ services:
     volumes:
       # Persist n8n workflows and credentials on the host
       - ./n8n_data:/home/node/.n8n
+
+  # ===================================================================
+  # ===== Telephony / Voice stack (merged from the VoiceClient app) ====
+  # ===================================================================
+  # Redis + LiveKit + LiveKit SIP + AI agent worker + web/token server.
+  # Host networking is required so SIP (5060), RTP/WebRTC media port ranges
+  # and public-IP detection work on a single Linux server. Ports used:
+  #   LiveKit 7880/7881, SIP 5060, RTP 10000-20000, WebRTC 50000-50200,
+  #   Redis 6379 (localhost only), agent health 8090, web/token server 2300.
+  # These do not collide with OrganAIzer (4815) or n8n (5678).
+  # All telephony settings/secrets are managed via the Telefonie page and
+  # persisted in ./data/telephony.env (shared with these services).
+
+  redis:
+    image: redis:7-alpine
+    container_name: organaizer-redis
+    network_mode: host
+    restart: unless-stopped
+    command: ["redis-server", "--bind", "127.0.0.1"]
+
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: organaizer-livekit
+    network_mode: host
+    restart: unless-stopped
+    depends_on: [redis]
+    command: ["--config", "/etc/livekit/livekit.yaml"]
+    volumes:
+      - ./voice/livekit.yaml:/etc/livekit/livekit.yaml:ro
+
+  livekit-sip:
+    image: livekit/sip:latest
+    container_name: organaizer-livekit-sip
+    network_mode: host
+    restart: unless-stopped
+    depends_on: [redis, livekit]
+    command: ["--config", "/etc/livekit/sip.yaml"]
+    volumes:
+      - ./voice/sip.yaml:/etc/livekit/sip.yaml:ro
+
+  voice-agent:
+    build:
+      context: ./voice
+      dockerfile: Dockerfile
+    image: organaizer-voice:latest
+    container_name: organaizer-voice-agent
+    network_mode: host
+    restart: unless-stopped
+    depends_on: [livekit]
+    environment:
+      - LIVEKIT_URL=ws://localhost:7880
+      - OBSIDIAN_ROOT=/app/obsidian
+    volumes:
+      # Shared, persisted config + phonebook (telephony.env managed via the UI).
+      - ./data:/app/data
+      # Obsidian vault (read-only) so the agent can use it as knowledge base.
+      - /home/hermes/obsidian:/app/obsidian:ro
+    command: ["python", "-m", "app.agent", "start"]
+
+  voice-web:
+    image: organaizer-voice:latest
+    container_name: organaizer-voice-web
+    network_mode: host
+    restart: unless-stopped
+    depends_on: [livekit, voice-agent]
+    environment:
+      - LIVEKIT_URL=ws://localhost:7880
+      # Public wss URL handed to browser Dialog clients is taken from the
+      # Telefonie config (data/telephony.env -> LIVEKIT_PUBLIC_URL), so it is
+      # not hard-coded here. It must be a TLS (wss://) endpoint that reverse-
+      # proxies to LiveKit's /rtc, because the app is served over HTTPS.
+      # Bind the control/token server on all interfaces so the control plane
+      # (OrganAIzer backend) and browsers can reach it.
+      - SERVER_HOST=0.0.0.0
+    volumes:
+      - ./data:/app/data
+      - /home/hermes/obsidian:/app/obsidian:ro
+    command: ["python", "-m", "app.web_server"]

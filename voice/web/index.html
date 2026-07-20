@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OrganAIzer · Voice Assistant</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="header">
+        <div class="logo">O</div>
+        <div>
+          <h1>OrganAIzer</h1>
+          <p class="subtitle">Your personal voice organizer</p>
+        </div>
+      </header>
+
+      <section class="status-card">
+        <span id="statusDot" class="dot dot--idle"></span>
+        <span id="statusText">Not connected</span>
+      </section>
+
+      <section class="mode-card">
+        <span class="mode-label">Mode</span>
+        <button id="modeToggle" class="mode-toggle" disabled>
+          <span class="mode-toggle__thumb"></span>
+          <span id="modeText" class="mode-toggle__text">Voice</span>
+        </button>
+        <span id="modeHint" class="mode-hint">Voice dialog active</span>
+      </section>
+
+      <section class="levels">
+        <div class="level">
+          <label>You</label>
+          <div class="meter"><div id="userLevel" class="meter__fill meter__fill--user"></div></div>
+        </div>
+        <div class="level">
+          <label>Assistant</label>
+          <div class="meter"><div id="agentLevel" class="meter__fill meter__fill--agent"></div></div>
+        </div>
+      </section>
+
+      <section class="controls">
+        <button id="callButton" class="call-button call-button--start">Start conversation</button>
+      </section>
+
+      <footer class="log-wrap">
+        <pre id="log" class="log"></pre>
+      </footer>
+    </main>
+
+    <!-- Hidden element the assistant's audio is attached to. -->
+    <audio id="agentAudio" autoplay></audio>
+
+    <script src="https://cdn.jsdelivr.net/npm/livekit-client@2/dist/livekit-client.umd.min.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>

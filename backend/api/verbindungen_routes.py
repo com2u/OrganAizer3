@@ -23,7 +23,7 @@ def _enforce_auth():
     return auth.enforce_auth()
 
 
-# Allowlist of valid template keys – exactly matching the 16 specified templates
+# Allowlist of valid template keys – the prepared integration templates
 VALID_TEMPLATE_KEYS = (
     "office",
     "outlook_kalender",
@@ -39,6 +39,8 @@ VALID_TEMPLATE_KEYS = (
     "onedrive",
     "jira",
     "confluence",
+    "sap",
+    "interflex",
     "n8n",
     "mcp",
 )

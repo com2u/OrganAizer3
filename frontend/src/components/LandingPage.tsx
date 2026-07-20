@@ -1,16 +1,35 @@
 import { useState } from 'react'
 import { useTheme } from '../ThemeContext'
-import { Calendar, CheckSquare, Cable, Mic, ArrowRight, Layers, GitBranch, Play, Sun, Moon, Globe } from 'lucide-react'
+import {
+  ArrowRight, Layers, GitBranch, Play, Sun, Moon, Globe,
+  CalendarClock, Bot, ListTodo, AudioLines, BookOpen, PhoneCall,
+  Blocks, BrainCircuit, ShieldCheck, Building2,
+} from 'lucide-react'
 import ProductPreview from './ProductPreview'
 import InterestModal from './InterestModal'
+import FeatureModal, { FeatureDef } from './FeatureModal'
 
 interface LandingPageProps {
   onGoToLogin: () => void
 }
 
+const FEATURES: FeatureDef[] = [
+  { id: 'planning',    icon: CalendarClock, wide: true },
+  { id: 'hermes',      icon: Bot,           wide: true },
+  { id: 'tasks',       icon: ListTodo },
+  { id: 'speech',      icon: AudioLines },
+  { id: 'knowledge',   icon: BookOpen },
+  { id: 'ai',          icon: BrainCircuit },
+  { id: 'telephony',   icon: PhoneCall,     wide: true },
+  { id: 'connections', icon: Blocks,        wide: true },
+  { id: 'privacy',     icon: ShieldCheck,   wide: true },
+  { id: 'about',       icon: Building2,     wide: true },
+]
+
 export default function LandingPage({ onGoToLogin }: LandingPageProps) {
   const { t, theme, setTheme, lang, setLang } = useTheme()
   const [interestOpen, setInterestOpen] = useState(false)
+  const [selectedFeature, setSelectedFeature] = useState<FeatureDef | null>(null)
 
   return (
     <div className="landing">
@@ -74,29 +93,35 @@ export default function LandingPage({ onGoToLogin }: LandingPageProps) {
         </div>
       </section>
 
-      {/* ===== Bento Story ===== */}
+      {/* ===== Feature Bento ===== */}
       <section className="landing-bento">
-        <div className="landing-bento-grid">
-          <div className="bento-cell large">
-            <div className="bento-icon"><Calendar size={22} /></div>
-            <h3>{t('landing.bento.calendar.title')}</h3>
-            <p>{t('landing.bento.calendar.desc')}</p>
-          </div>
-          <div className="bento-cell">
-            <div className="bento-icon"><CheckSquare size={22} /></div>
-            <h3>{t('landing.bento.tasks.title')}</h3>
-            <p>{t('landing.bento.tasks.desc')}</p>
-          </div>
-          <div className="bento-cell">
-            <div className="bento-icon"><Cable size={22} /></div>
-            <h3>{t('landing.bento.ai.title')}</h3>
-            <p>{t('landing.bento.ai.desc')}</p>
-          </div>
-          <div className="bento-cell wide">
-            <div className="bento-icon"><Mic size={22} /></div>
-            <h3>{t('landing.bento.speech.title')}</h3>
-            <p>{t('landing.bento.speech.desc')}</p>
-          </div>
+        <div className="landing-bento-head">
+          <h2>{t('landing.sections.title')}</h2>
+          <p>{t('landing.sections.sub')}</p>
+        </div>
+        <div className="feature-bento-grid">
+          {FEATURES.map((f, i) => {
+            const Icon = f.icon
+            return (
+              <button
+                type="button"
+                key={f.id}
+                className={`feature-cell${f.wide ? ' wide' : ''}`}
+                style={{ animationDelay: `${0.04 * i}s` }}
+                onClick={() => setSelectedFeature(f)}
+                aria-label={t(`landing.feat.${f.id}.title`)}
+              >
+                <div className="feature-cell-icon"><Icon size={22} /></div>
+                <div className="feature-cell-text">
+                  <h3>{t(`landing.feat.${f.id}.title`)}</h3>
+                  <p>{t(`landing.feat.${f.id}.short`)}</p>
+                </div>
+                <span className="feature-cell-more">
+                  {t('landing.feat.more')} <ArrowRight size={13} />
+                </span>
+              </button>
+            )
+          })}
         </div>
       </section>
 
@@ -169,6 +194,9 @@ export default function LandingPage({ onGoToLogin }: LandingPageProps) {
       </footer>
 
       <InterestModal open={interestOpen} onClose={() => setInterestOpen(false)} />
+      {selectedFeature && (
+        <FeatureModal feature={selectedFeature} onClose={() => setSelectedFeature(null)} />
+      )}
     </div>
   )
 }

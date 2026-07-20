@@ -1,0 +1,20 @@
+# LiveKit server configuration (production, single node with Redis + SIP).
+# Uses host networking, so Redis is reached on localhost.
+port: 7880
+log_level: info
+
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 50200
+  # Detect the server's public IP so WebRTC media works from the internet.
+  use_external_ip: true
+
+# Redis is required so the SIP service can coordinate with the server.
+redis:
+  address: localhost:6379
+
+# API keys shared by the agent, web token server and SIP service.
+# Override these for a real production deployment.
+keys:
+  devkey: secret

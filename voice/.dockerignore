@@ -1,0 +1,10 @@
+# Voice-stack image build context excludes.
+.venv/
+**/__pycache__/
+*.pyc
+*.pyo
+.env
+.git/
+*.md
+# Runtime phonebook (seeded/created at runtime, persisted via the data volume).
+data/phonebook.json

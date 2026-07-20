@@ -49,18 +49,58 @@ export interface User {
 
 // ===== Telephony =====
 
-export type SipMode = 'disabled' | 'demo' | 'webhook' | 'sipjs'
+// Full telephony configuration managed on the Telefonie page. Secret fields are
+// write-only: the backend only reports whether they are set (has_*).
+export interface TelephonyConfig {
+  enabled: string
+  provider: string
+  phone_number: string
+  // Twilio
+  twilio_account_sid: string
+  has_twilio_auth_token: boolean
+  twilio_sip_uri: string
+  twilio_trunk_sid: string
+  outbound_trunk_id: string
+  // OpenAI
+  has_openai_api_key: boolean
+  openai_realtime_model: string
+  openai_voice: string
+  openai_search_model: string
+  // LiveKit
+  livekit_url: string
+  livekit_public_url: string
+  livekit_api_key: string
+  has_livekit_api_secret: boolean
+  web_room_name: string
+  // Assistant
+  assistant_name: string
+  assistant_greeting: string
+  assistant_languages: string
+  // Knowledge
+  knowledge_source: string
+  obsidian_vault: string
+  config_path_configured: boolean
+}
 
-export interface SipConfig {
-  mode: SipMode
-  sip_server: string
-  sip_port: number
-  sip_username: string
-  sip_transport: string
-  stun_server: string
-  webhook_url: string
-  has_password: boolean
-  updated_at: string | null
+export interface TelephonyStatus {
+  enabled: boolean
+  phone_number: string
+  provider: string
+  voice: {
+    reachable: boolean
+    livekit_ok?: boolean
+    active_rooms?: number
+    inbound_configured?: boolean
+    outbound_configured?: boolean
+    error?: string
+  }
+}
+
+export interface WebToken {
+  token: string
+  url: string
+  room: string
+  identity: string
 }
 
 export interface Call {
@@ -87,10 +127,18 @@ export interface CallDetail extends Call {
   dialog: DialogEntry[]
 }
 
+// A phonebook contact (shared with the phone assistant). Notes are appended by
+// the assistant after a call and are editable in the Telefonate tab.
+export interface PhonebookContact {
+  number: string
+  name: string
+  notes: string[]
+}
+
 export interface VoiceResponse {
   reply?: string
   error?: string
-  mode: string
+  mode?: string
 }
 
 // ===== TTS / STT / YouTube / OCR =====
@@ -169,10 +217,16 @@ export interface Komponente {
   erstellt_am: string
 }
 
+export interface GruppenMitglied {
+  nummer: string
+  bezeichnung: string
+  name: string | null
+}
+
 export interface Gruppe {
   gruppe: string
   bereich: string
-  mitglieder: { nummer: string; bezeichnung: string; name: string | null }[]
+  mitglieder: GruppenMitglied[]
 }
 
 export interface TerminDef {

@@ -10,7 +10,7 @@ from flask import Blueprint, g, jsonify, request, send_file
 
 from backend import auth
 from backend.api.logging_middleware import clear_log_entries, get_log_entries
-from backend.config import CONFIG_PATH, DB_PATH
+from backend.config import CONFIG_PATH, DB_PATH, HERMES_API_KEY, HERMES_API_URL, HERMES_MODEL
 from backend.db.sqlite_adapter import SQLiteAdapter
 
 logger = logging.getLogger(__name__)
@@ -373,7 +373,7 @@ _CONFIG_DEFAULTS = {
     "ocr_default_language": "de",
     "obsidian_vault_path": "/vault/obsidian",
     "obsidian_api_url": "http://localhost:8090",
-    "hermes_api_url": "http://localhost:8080",
+    "hermes_api_url": "",
 }
 
 _CONFIG_TYPES = {
@@ -449,471 +449,10 @@ def save_config():
 
 
 # ===== Telephony API =====
-
-# Sensitive fields that must never appear in responses
-_SIP_SECRET_FIELDS = {"sip_password_hash"}
-
-# Valid modes for the SIP gateway
-_SIP_MODES = {"disabled", "demo", "webhook", "sipjs"}
-
-
-def _hash_sip_password(password: str) -> str:
-    """Salted iterated PBKDF2-HMAC-SHA256 hash for SIP password storage.
-
-    Format: ``pbkdf2:<iterations>:<hex-salt>:<hex-dk>``
-
-    NOTE: This hash is intentionally NOT reversible.  It cannot be used to
-    recover the plaintext password required for SIP REGISTER authentication.
-    Real provider deployments MUST use a dedicated secret-management system
-    or a provider-specific adapter that stores credentials securely (e.g.
-    HashiCorp Vault, AWS Secrets Manager) rather than relying on this hash.
-    """
-    import os as _os
-    salt = _os.urandom(16)
-    iterations = 260_000
-    dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
-    return f"pbkdf2:{iterations}:{salt.hex()}:{dk.hex()}"
-
-
-def _verify_sip_password(password: str, stored_hash: str) -> bool:
-    """Verify a password against a stored PBKDF2 hash."""
-    if not stored_hash or not stored_hash.startswith("pbkdf2:"):
-        return False
-    try:
-        _, iterations_s, salt_hex, dk_hex = stored_hash.split(":")
-        dk = hashlib.pbkdf2_hmac(
-            "sha256", password.encode("utf-8"),
-            bytes.fromhex(salt_hex), int(iterations_s),
-        )
-        return dk.hex() == dk_hex
-    except (ValueError, TypeError):
-        return False
-
-
-# Valid transports for SIP
-_SIP_TRANSPORTS = {"wss", "ws", "udp", "tcp"}
-
-
-def _sanitize_sip_row(row: dict) -> dict:
-    """Remove secret fields from a SIP config row before returning."""
-    return {k: v for k, v in row.items() if k not in _SIP_SECRET_FIELDS}
-
-
-def _ensure_telephony_tables(db: SQLiteAdapter) -> None:
-    """Create telephony tables if they don't exist yet."""
-    from backend.db.models import CREATE_TABLES
-
-    for stmt in CREATE_TABLES:
-        if "sip_config" in stmt or "calls" in stmt or "call_dialog_entries" in stmt:
-            db.execute(stmt)
-
-
-def _get_sip_mode(db: SQLiteAdapter) -> str:
-    """Return the current SIP gateway mode, defaulting to 'disabled'."""
-    row = db.fetchone("SELECT mode FROM sip_config WHERE id = 1")
-    return row["mode"] if row else "disabled"
-
-
-@api_bp.route("/telephony/config", methods=["GET"])
-def get_sip_config():
-    """Return the SIP gateway configuration (secrets redacted)."""
-    db = get_db()
-    try:
-        _ensure_telephony_tables(db)
-        row = db.fetchone("SELECT * FROM sip_config WHERE id = 1")
-        if not row:
-            return jsonify({
-                "mode": "disabled",
-                "sip_server": "",
-                "sip_port": 5060,
-                "sip_username": "",
-                "sip_transport": "wss",
-                "stun_server": "",
-                "webhook_url": "",
-                "has_password": False,
-                "updated_at": None,
-            })
-        result = _sanitize_sip_row(dict(row))
-        result["has_password"] = bool(row.get("sip_password_hash"))
-        return jsonify(result)
-    finally:
-        db.disconnect()
-
-
-@api_bp.route("/telephony/config", methods=["POST"])
-def save_sip_config():
-    """Create or update the SIP gateway configuration."""
-    body = request.get_json(silent=True)
-    if not isinstance(body, dict):
-        return jsonify({"error": "JSON object required"}), 400
-
-    mode = body.get("mode", "disabled")
-    if mode not in _SIP_MODES:
-        return jsonify({"error": f"Invalid mode. Must be one of: {', '.join(sorted(_SIP_MODES))}"}), 400
-
-    # --- Validate sip_port ---
-    sip_port = body.get("sip_port")
-    if sip_port is not None:
-        try:
-            sip_port = int(sip_port)
-        except (ValueError, TypeError):
-            return jsonify({"error": "sip_port must be an integer"}), 400
-        if not (1 <= sip_port <= 65535):
-            return jsonify({"error": "sip_port must be between 1 and 65535"}), 400
-
-    # --- Validate sip_transport ---
-    sip_transport = body.get("sip_transport")
-    if sip_transport is not None and sip_transport not in _SIP_TRANSPORTS:
-        return jsonify({"error": f"sip_transport must be one of: {', '.join(sorted(_SIP_TRANSPORTS))}"}), 400
-
-    # --- Validate webhook_url ---
-    webhook_url = body.get("webhook_url")
-    if webhook_url is not None and webhook_url != "":
-        if not (webhook_url.startswith("https://") or webhook_url.startswith("http://")):
-            return jsonify({"error": "webhook_url must be a valid HTTP(S) URL"}), 400
-
-    db = get_db()
-    try:
-        _ensure_telephony_tables(db)
-        existing = db.fetchone("SELECT * FROM sip_config WHERE id = 1")
-
-        password_hash = ""
-        if "sip_password" in body and body["sip_password"]:
-            password_hash = _hash_sip_password(body["sip_password"])
-        elif existing:
-            password_hash = existing["sip_password_hash"] or ""
-
-        if existing:
-            db.execute(
-                """UPDATE sip_config SET
-                    mode = ?, sip_server = ?, sip_port = ?, sip_username = ?,
-                    sip_password_hash = ?, sip_transport = ?, stun_server = ?,
-                    webhook_url = ?, updated_at = datetime('now')
-                WHERE id = 1""",
-                (
-                    mode,
-                    body.get("sip_server", existing["sip_server"]),
-                    body.get("sip_port", existing["sip_port"]),
-                    body.get("sip_username", existing["sip_username"]),
-                    password_hash,
-                    body.get("sip_transport", existing["sip_transport"]),
-                    body.get("stun_server", existing["stun_server"]),
-                    body.get("webhook_url", existing["webhook_url"]),
-                ),
-            )
-        else:
-            db.execute(
-                """INSERT INTO sip_config
-                    (id, mode, sip_server, sip_port, sip_username, sip_password_hash,
-                     sip_transport, stun_server, webhook_url)
-                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    mode,
-                    body.get("sip_server", ""),
-                    body.get("sip_port", 5060),
-                    body.get("sip_username", ""),
-                    password_hash,
-                    body.get("sip_transport", "wss"),
-                    body.get("stun_server", ""),
-                    body.get("webhook_url", ""),
-                ),
-            )
-
-        row = db.fetchone("SELECT * FROM sip_config WHERE id = 1")
-        result = _sanitize_sip_row(dict(row))
-        result["has_password"] = bool(row.get("sip_password_hash"))
-        return jsonify(result)
-    finally:
-        db.disconnect()
-
-
-@api_bp.route("/telephony/calls", methods=["GET"])
-def list_calls():
-    """Return all calls ordered by most recent first."""
-    db = get_db()
-    try:
-        _ensure_telephony_tables(db)
-        rows = db.fetchall(
-            "SELECT * FROM calls ORDER BY started_at DESC LIMIT 200"
-        )
-        return jsonify([dict(r) for r in rows])
-    finally:
-        db.disconnect()
-
-
-@api_bp.route("/telephony/calls/<int:call_id>", methods=["GET"])
-def get_call_detail(call_id: int):
-    """Return a single call with its full dialog log."""
-    db = get_db()
-    try:
-        _ensure_telephony_tables(db)
-        call = db.fetchone("SELECT * FROM calls WHERE id = ?", (call_id,))
-        if not call:
-            return jsonify({"error": "Call not found"}), 404
-        entries = db.fetchall(
-            "SELECT * FROM call_dialog_entries WHERE call_id = ? ORDER BY timestamp ASC",
-            (call_id,),
-        )
-        result = dict(call)
-        result["dialog"] = [dict(e) for e in entries]
-        return jsonify(result)
-    finally:
-        db.disconnect()
-
-
-@api_bp.route("/telephony/calls", methods=["POST"])
-def start_call():
-    """Initiate a new call (demo/webhook mode only if configured)."""
-    body = request.get_json(silent=True) or {}
-    remote_number = (body.get("remote_number") or "").strip()
-    direction = body.get("direction", "outbound")
-
-    # --- Input validation ---
-    if not remote_number:
-        return jsonify({"error": "remote_number must not be empty"}), 400
-    if direction not in ("inbound", "outbound"):
-        return jsonify({"error": "direction must be 'inbound' or 'outbound'"}), 400
-
-    db = get_db()
-    try:
-        _ensure_telephony_tables(db)
-        mode = _get_sip_mode(db)
-
-        if mode == "disabled":
-            return jsonify({
-                "error": "Telephony is disabled. Configure a SIP gateway first.",
-                "mode": mode,
-            }), 409
-
-        if mode == "demo":
-            # Demo mode: create the call record but mark it clearly as demo/simulated
-            db.execute(
-                "INSERT INTO calls (direction, remote_number, status, summary) VALUES (?, ?, 'demo', '[DEMO] Simulated call - no real connection')",
-                (direction, remote_number),
-            )
-            call = db.fetchone("SELECT * FROM calls ORDER BY id DESC LIMIT 1")
-            # Add a system dialog entry
-            db.execute(
-                "INSERT INTO call_dialog_entries (call_id, role, content, status) VALUES (?, 'system', 'Demo mode: no real SIP connection established.', 'info')",
-                (call["id"],),
-            )
-            call_dialog = db.fetchall(
-                "SELECT * FROM call_dialog_entries WHERE call_id = ? ORDER BY timestamp ASC",
-                (call["id"],),
-            )
-            result = dict(call)
-            result["dialog"] = [dict(entry) for entry in call_dialog]
-            return jsonify(result), 201
-
-        if mode == "webhook":
-            config = db.fetchone("SELECT webhook_url FROM sip_config WHERE id = 1")
-            webhook_url = config["webhook_url"] if config else ""
-            if not webhook_url:
-                return jsonify({"error": "Webhook URL not configured"}), 409
-            # Create the call record
-            db.execute(
-                "INSERT INTO calls (direction, remote_number, status, summary) VALUES (?, ?, 'initiated', 'Webhook dispatch pending')",
-                (direction, remote_number),
-            )
-            call = db.fetchone("SELECT * FROM calls ORDER BY id DESC LIMIT 1")
-            call_id_val = call["id"]
-
-            # Actually dispatch to the configured webhook provider
-            import urllib.request
-            import urllib.error
-            try:
-                payload = json.dumps({
-                    "remote_number": remote_number,
-                    "direction": direction,
-                    "call_id": call_id_val,
-                }).encode("utf-8")
-                req = urllib.request.Request(
-                    webhook_url,
-                    data=payload,
-                    headers={"Content-Type": "application/json"},
-                    method="POST",
-                )
-                with urllib.request.urlopen(req, timeout=10) as resp:
-                    resp.read()  # consume response
-                db.execute(
-                    "UPDATE calls SET status = 'active', summary = 'Webhook provider notified' WHERE id = ?",
-                    (call_id_val,),
-                )
-            except Exception as exc:
-                logger.warning("Webhook dispatch failed: %s", type(exc).__name__)
-                # Record redacted error as system dialog entry
-                redacted_msg = f"Webhook provider error: {type(exc).__name__} (details redacted)"
-                db.execute(
-                    "INSERT INTO call_dialog_entries (call_id, role, content, status) VALUES (?, 'system', ?, 'error')",
-                    (call_id_val, redacted_msg),
-                )
-                db.execute(
-                    "UPDATE calls SET status = 'error', summary = 'Webhook dispatch failed' WHERE id = ?",
-                    (call_id_val,),
-                )
-                call = db.fetchone("SELECT * FROM calls WHERE id = ?", (call_id_val,))
-                result = dict(call)
-                result["dialog"] = []
-                return jsonify({"error": redacted_msg, "call": result}), 502
-
-            call = db.fetchone("SELECT * FROM calls WHERE id = ?", (call_id_val,))
-            result = dict(call)
-            result["dialog"] = []
-            return jsonify(result), 201
-
-        if mode == "sipjs":
-            # SIP.js mode: call is handled client-side, we just record it
-            db.execute(
-                "INSERT INTO calls (direction, remote_number, status) VALUES (?, ?, 'initiated')",
-                (direction, remote_number),
-            )
-            call = db.fetchone("SELECT * FROM calls ORDER BY id DESC LIMIT 1")
-            result = dict(call)
-            result["dialog"] = []
-            return jsonify(result), 201
-
-        return jsonify({"error": f"Unknown mode: {mode}"}), 500
-    finally:
-        db.disconnect()
-
-
-@api_bp.route("/telephony/calls/<int:call_id>/end", methods=["POST"])
-def end_call(call_id: int):
-    """End/hang up a call."""
-    db = get_db()
-    try:
-        _ensure_telephony_tables(db)
-        call = db.fetchone("SELECT * FROM calls WHERE id = ?", (call_id,))
-        if not call:
-            return jsonify({"error": "Call not found"}), 404
-        db.execute(
-            """UPDATE calls SET status = 'ended',
-               ended_at = datetime('now'),
-               duration_seconds = CAST((julianday(datetime('now')) - julianday(started_at)) * 86400 AS INTEGER)
-            WHERE id = ?""",
-            (call_id,),
-        )
-        updated = db.fetchone("SELECT * FROM calls WHERE id = ?", (call_id,))
-        return jsonify(dict(updated))
-    finally:
-        db.disconnect()
-
-
-@api_bp.route("/telephony/calls/<int:call_id>/dialog", methods=["POST"])
-def add_dialog_entry(call_id: int):
-    """Add a dialog entry (voice message) to a call."""
-    body = request.get_json(silent=True) or {}
-    role = body.get("role", "user")
-    content = body.get("content", "")
-    status = body.get("status", "ok")
-
-    if role not in ("user", "assistant", "system"):
-        return jsonify({"error": "Role must be user, assistant, or system"}), 400
-
-    db = get_db()
-    try:
-        _ensure_telephony_tables(db)
-        call = db.fetchone("SELECT * FROM calls WHERE id = ?", (call_id,))
-        if not call:
-            return jsonify({"error": "Call not found"}), 404
-
-        db.execute(
-            "INSERT INTO call_dialog_entries (call_id, role, content, status) VALUES (?, ?, ?, ?)",
-            (call_id, role, content, status),
-        )
-        entry = db.fetchone(
-            "SELECT * FROM call_dialog_entries ORDER BY id DESC LIMIT 1"
-        )
-        return jsonify(dict(entry)), 201
-    finally:
-        db.disconnect()
-
-
-@api_bp.route("/telephony/voice", methods=["POST"])
-def voice_message():
-    """Send a voice message to Hermes and get a response.
-
-    In demo mode, returns a canned response.
-    In other modes, forwards to the configured Hermes API.
-    """
-    body = request.get_json(silent=True) or {}
-    message = (body.get("message") or "").strip()
-    call_id = body.get("call_id")
-
-    if not message:
-        return jsonify({"error": "Message is required"}), 400
-
-    db = get_db()
-    try:
-        _ensure_telephony_tables(db)
-        mode = _get_sip_mode(db)
-
-        # Record user message if call_id provided
-        if call_id:
-            call = db.fetchone("SELECT * FROM calls WHERE id = ?", (call_id,))
-            if call:
-                db.execute(
-                    "INSERT INTO call_dialog_entries (call_id, role, content, status) VALUES (?, 'user', ?, 'ok')",
-                    (call_id, message),
-                )
-
-        if mode == "disabled":
-            return jsonify({
-                "error": "Telephony is disabled. Configure a SIP gateway first.",
-                "mode": mode,
-            }), 409
-
-        if mode == "demo":
-            reply = f"[DEMO] Hermes hat Ihre Nachricht erhalten: \"{message}\". Dies ist eine Simulation – im Produktionsmodus wird diese Nachricht an den KI-Assistenten weitergeleitet."
-            if call_id:
-                db.execute(
-                    "INSERT INTO call_dialog_entries (call_id, role, content, status) VALUES (?, 'assistant', ?, 'demo')",
-                    (call_id, reply),
-                )
-            return jsonify({"reply": reply, "mode": "demo"})
-
-        # For webhook/sipjs modes, try to forward to Hermes API
-        config = _read_config()
-        hermes_url = config.get("hermes_api_url", "")
-        if not hermes_url:
-            return jsonify({
-                "error": "Hermes API URL not configured. Set hermes_api_url in application configuration.",
-                "mode": mode,
-            }), 409
-
-        # Attempt to forward the message to Hermes
-        import urllib.request
-        import urllib.error
-
-        try:
-            req_data = json.dumps({"message": message}).encode("utf-8")
-            req = urllib.request.Request(
-                f"{hermes_url}/api/v1/chat",
-                data=req_data,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                resp_data = json.loads(resp.read().decode("utf-8"))
-                reply = resp_data.get("reply", resp_data.get("message", str(resp_data)))
-        except (urllib.error.URLError, urllib.error.HTTPError, Exception) as e:
-            logger.warning("Hermes API call failed: %s", e)
-            reply = f"Hermes API nicht erreichbar ({type(e).__name__}). Bitte prüfen Sie die Konfiguration."
-            if call_id:
-                db.execute(
-                    "INSERT INTO call_dialog_entries (call_id, role, content, status) VALUES (?, 'system', ?, 'error')",
-                    (call_id, reply),
-                )
-            return jsonify({"error": reply, "mode": mode}), 502
-
-        if call_id:
-            db.execute(
-                "INSERT INTO call_dialog_entries (call_id, role, content, status) VALUES (?, 'assistant', ?, 'ok')",
-                (call_id, reply),
-            )
-        return jsonify({"reply": reply, "mode": mode})
-    finally:
-        db.disconnect()
+# The telephony REST API now lives in backend/api/telephony_routes.py
+# (Twilio + LiveKit + OpenAI Realtime voice stack, merged from VoiceClient).
+# The former SQLite SIP-gateway implementation was removed to avoid route
+# collisions and schema drift.
 
 
 # ===== TTS / STT / YouTube / OCR / Hermes Execute =====
@@ -1494,9 +1033,59 @@ def ocr_extract_url():
         return jsonify({"error": f"Fehler: {type(e).__name__} / Error"}), 500
 
 
+class _HermesNotConfigured(Exception):
+    """Raised when no Hermes API URL is configured/resolvable."""
+
+
+def _resolve_hermes_url() -> str:
+    """Resolve the Hermes API base URL: UI config override, else the env default."""
+    config = _read_config()
+    url = (config.get("hermes_api_url") or "").strip() or HERMES_API_URL
+    return url.rstrip("/")
+
+
+def _hermes_chat(prompt: str, timeout: int = 120) -> str:
+    """Send a single-turn prompt to the Hermes OpenAI-compatible agent API.
+
+    Returns the assistant message content. Raises _HermesNotConfigured when no
+    URL is available, or the underlying urllib error on transport failures.
+    """
+    import urllib.request
+
+    hermes_url = _resolve_hermes_url()
+    if not hermes_url:
+        raise _HermesNotConfigured()
+
+    req_data = json.dumps({
+        "model": HERMES_MODEL,
+        "messages": [{"role": "user", "content": prompt}],
+    }).encode("utf-8")
+    headers = {"Content-Type": "application/json"}
+    if HERMES_API_KEY:
+        headers["Authorization"] = f"Bearer {HERMES_API_KEY}"
+
+    req = urllib.request.Request(
+        f"{hermes_url}/v1/chat/completions",
+        data=req_data,
+        headers=headers,
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+
+    choices = data.get("choices") or []
+    if choices:
+        message = choices[0].get("message") or {}
+        content = message.get("content")
+        if isinstance(content, str) and content:
+            return content
+    # Fallbacks for non-standard responses.
+    return data.get("result") or data.get("response") or data.get("text") or ""
+
+
 @api_bp.route("/hermes/execute", methods=["POST"])
 def hermes_execute():
-    """Forward a task prompt to the Hermes API for execution."""
+    """Forward a task prompt to the Hermes agent API for execution."""
     body = request.get_json(silent=True) or {}
     prompt = (body.get("prompt") or "").strip()
 
@@ -1505,34 +1094,20 @@ def hermes_execute():
     if len(prompt) > 50000:
         return jsonify({"error": "Prompt zu lang (max 50.000 Zeichen) / Prompt too long"}), 400
 
-    config = _read_config()
-    hermes_url = config.get("hermes_api_url", "")
-
-    if not hermes_url:
+    try:
+        content = _hermes_chat(prompt, timeout=120)
+    except _HermesNotConfigured:
         return jsonify({
             "error": "Hermes API nicht konfiguriert. Bitte hermes_api_url in den Einstellungen setzen. / Hermes API not configured.",
             "config_required": "hermes_api_url",
         }), 409
-
-    import urllib.request
-    import urllib.error
-
-    try:
-        req_data = json.dumps({"prompt": prompt}).encode("utf-8")
-        req = urllib.request.Request(
-            f"{hermes_url}/api/v1/execute",
-            data=req_data,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            resp_data = json.loads(resp.read().decode("utf-8"))
-        return jsonify(resp_data)
     except Exception as e:
         logger.warning("Hermes execute failed: %s", type(e).__name__)
         return jsonify({
             "error": f"Hermes API nicht erreichbar ({type(e).__name__}). / Hermes API unreachable.",
         }), 502
+
+    return jsonify({"result": content})
 
 
 @api_bp.route("/hermes/improve-prompt", methods=["POST"])
@@ -1543,29 +1118,20 @@ def hermes_improve_prompt():
     if not text:
         return jsonify({"error": "Text ist erforderlich"}), 400
 
-    config = _read_config()
-    hermes_url = config.get("hermes_api_url", "")
-    if not hermes_url:
-        # Local fallback: just add quality boosters
-        return jsonify({"improved": f"{text}, highly detailed, professional quality, masterful composition"})
-
-    import urllib.request
+    fallback = f"{text}, highly detailed, professional quality, masterful composition"
     try:
-        prompt = f"Verbessere folgenden Bild-Prompt für bessere KI-Bildgenerierung. Gib nur den verbesserten Prompt zurück, keine Erklärung: {text}"
-        req_data = json.dumps({"prompt": prompt}).encode("utf-8")
-        req = urllib.request.Request(
-            f"{hermes_url}/api/v1/execute",
-            data=req_data,
-            headers={"Content-Type": "application/json"},
-            method="POST",
+        prompt = (
+            "Verbessere folgenden Bild-Prompt für bessere KI-Bildgenerierung. "
+            "Gib nur den verbesserten Prompt zurück, keine Erklärung: " + text
         )
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            resp_data = json.loads(resp.read().decode("utf-8"))
-        improved = resp_data.get("result") or resp_data.get("response") or text
-        return jsonify({"improved": improved})
+        improved = _hermes_chat(prompt, timeout=30)
+        return jsonify({"improved": (improved or "").strip() or fallback})
+    except _HermesNotConfigured:
+        # Local fallback: just add quality boosters
+        return jsonify({"improved": fallback})
     except Exception as e:
         logger.warning("Hermes improve-prompt failed: %s", type(e).__name__)
-        return jsonify({"improved": f"{text}, highly detailed, professional quality, masterful composition"})
+        return jsonify({"improved": fallback})
 
 
 # ===== Task History =====

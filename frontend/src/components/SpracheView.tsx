@@ -1,7 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useTheme } from '../ThemeContext'
-import { Volume2, Mic, MicOff, Play, Loader2, Download, Copy, Check, ArrowRight, FileText } from 'lucide-react'
+import { Volume2, Mic, MicOff, Play, Loader2, Download, Copy, Check, ArrowRight, FileText, MessagesSquare } from 'lucide-react'
 import { generateTTS, transcribeAudio, transcribeBlob } from '../api'
+import DialogView from './DialogView'
 
 // API_BASE matches the value from api.ts (VITE_API_BASE or '/api')
 const API_BASE = import.meta.env.VITE_API_BASE ?? '/api'
@@ -12,7 +13,7 @@ function apiUrl(path: string): string {
   return `${API_BASE}${cleanPath}`
 }
 
-type SpracheTab = 'tts' | 'stt' | 'dictation'
+type SpracheTab = 'tts' | 'stt' | 'dictation' | 'dialog'
 type DictationStatus = 'idle' | 'requesting' | 'recording' | 'stopping' | 'transcribing' | 'error'
 
 export default function SpracheView() {
@@ -192,6 +193,7 @@ export default function SpracheView() {
         <button className={`tab-btn ${activeTab === 'tts' ? 'active' : ''}`} onClick={() => setActiveTab('tts')}><Volume2 size={14} /> {t('sprache.tts')}</button>
         <button className={`tab-btn ${activeTab === 'stt' ? 'active' : ''}`} onClick={() => setActiveTab('stt')}><Mic size={14} /> {t('sprache.stt')}</button>
         <button className={`tab-btn ${activeTab === 'dictation' ? 'active' : ''}`} onClick={() => setActiveTab('dictation')}><MicOff size={14} /> {t('sprache.dictation')}</button>
+        <button className={`tab-btn ${activeTab === 'dialog' ? 'active' : ''}`} onClick={() => setActiveTab('dialog')}><MessagesSquare size={14} /> {t('sprache.dialog')}</button>
       </div>
 
       {activeTab === 'tts' && (
@@ -338,6 +340,11 @@ export default function SpracheView() {
               </div>
             </div>
           )}
+        </div>
+      )}
+      {activeTab === 'dialog' && (
+        <div className="tts-wrapper">
+          <DialogView />
         </div>
       )}
     </section>

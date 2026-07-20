@@ -15,6 +15,8 @@ import {
   BookMarked,
   Workflow,
   Cpu,
+  Building2,
+  Fingerprint,
   Plus,
   Trash2,
   X,
@@ -68,6 +70,8 @@ const TEMPLATES: TemplateDef[] = [
   { key: 'onedrive',          labelKey: 'vb.tpl.onedrive',          descKey: 'vb.tpl.onedrive.desc',          icon: HardDrive },
   { key: 'jira',              labelKey: 'vb.tpl.jira',              descKey: 'vb.tpl.jira.desc',              icon: Ticket },
   { key: 'confluence',        labelKey: 'vb.tpl.confluence',        descKey: 'vb.tpl.confluence.desc',        icon: BookMarked },
+  { key: 'sap',               labelKey: 'vb.tpl.sap',               descKey: 'vb.tpl.sap.desc',               icon: Building2 },
+  { key: 'interflex',         labelKey: 'vb.tpl.interflex',         descKey: 'vb.tpl.interflex.desc',         icon: Fingerprint,  weight: 'wide' },
   { key: 'n8n',               labelKey: 'vb.tpl.n8n',              descKey: 'vb.tpl.n8n.desc',               icon: Workflow,    weight: 'wide' },
   { key: 'mcp',               labelKey: 'vb.tpl.mcp',              descKey: 'vb.tpl.mcp.desc',               icon: Cpu },
 ]

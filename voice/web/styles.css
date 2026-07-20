@@ -1,0 +1,199 @@
+:root {
+  --bg: #0f1220;
+  --card: #1a1e33;
+  --card-2: #232841;
+  --accent: #6c8cff;
+  --accent-2: #43e6c0;
+  --text: #e8ebf7;
+  --muted: #8b90ad;
+  --danger: #ff5d6c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(1200px 800px at 50% -10%, #23294a 0%, var(--bg) 55%);
+  color: var(--text);
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+.app {
+  width: min(440px, 92vw);
+  background: var(--card);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 20px;
+  padding: 28px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.logo {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 22px;
+  color: #0f1220;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+}
+
+h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.subtitle {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.status-card,
+.mode-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--card-2);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+}
+.dot--idle { background: var(--muted); }
+.dot--connecting { background: #ffce54; animation: pulse 1s infinite; }
+.dot--live { background: var(--accent-2); box-shadow: 0 0 12px var(--accent-2); }
+.dot--error { background: var(--danger); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.mode-label {
+  font-size: 13px;
+  color: var(--muted);
+  min-width: 42px;
+}
+
+.mode-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  border-radius: 999px;
+  padding: 6px 14px 6px 6px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #0f1220;
+  font-weight: 600;
+  cursor: pointer;
+}
+.mode-toggle:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.mode-toggle--muted {
+  background: var(--card);
+  color: var(--muted);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+.mode-toggle__thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #0f1220;
+}
+.mode-toggle--muted .mode-toggle__thumb {
+  background: var(--muted);
+}
+.mode-hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin-left: auto;
+}
+
+.levels {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+.level {
+  display: grid;
+  grid-template-columns: 78px 1fr;
+  align-items: center;
+  gap: 12px;
+}
+.level label {
+  font-size: 13px;
+  color: var(--muted);
+}
+.meter {
+  height: 12px;
+  border-radius: 8px;
+  background: var(--card-2);
+  overflow: hidden;
+}
+.meter__fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 8px;
+  transition: width 60ms linear;
+}
+.meter__fill--user { background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+.meter__fill--agent { background: linear-gradient(90deg, var(--accent-2), var(--accent)); }
+
+.controls {
+  margin-bottom: 18px;
+}
+.call-button {
+  width: 100%;
+  border: none;
+  border-radius: 14px;
+  padding: 16px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #0f1220;
+  transition: transform 80ms ease, filter 120ms ease;
+}
+.call-button:hover { filter: brightness(1.05); }
+.call-button:active { transform: scale(0.99); }
+.call-button--start { background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
+.call-button--end { background: linear-gradient(135deg, var(--danger), #ff8a5c); color: #fff; }
+
+.log-wrap {
+  max-height: 140px;
+  overflow: auto;
+  background: #0c0f1c;
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.log {
+  margin: 0;
+  font-family: "SF Mono", "Cascadia Code", monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+}

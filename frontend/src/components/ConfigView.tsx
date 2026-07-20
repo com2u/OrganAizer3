@@ -38,7 +38,7 @@ export default function ConfigView() {
     ocr_default_language: 'de',
     obsidian_vault_path: '/vault/obsidian',
     obsidian_api_url: 'http://localhost:8090',
-    hermes_api_url: 'http://localhost:8080',
+    hermes_api_url: '',
   })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -148,7 +148,7 @@ export default function ConfigView() {
             <div className="config-group">
               <div className="form-group">
                 <label>{t('config.hermesApi')}</label>
-                <input type="url" value={config.hermes_api_url} onChange={e => updateConfig('hermes_api_url', e.target.value)} placeholder="http://localhost:8080" />
+                <input type="url" value={config.hermes_api_url} onChange={e => updateConfig('hermes_api_url', e.target.value)} placeholder="(Standard: host.docker.internal:8642)" />
               </div>
             </div>
           </div>

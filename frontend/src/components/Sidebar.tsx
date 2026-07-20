@@ -57,7 +57,7 @@ export default function Sidebar({ active, onSelect, user, onLogout }: SidebarPro
       <div className="sidebar-brand">
         <img src="/organaizer.png" alt="OrganAIzer" className="brand-mark" />
         <span className="brand-text">
-          <strong>OrganAIzer <small className="brand-version">v0.1.5</small></strong>
+          <strong>OrganAIzer <small className="brand-version">v0.1.7</small></strong>
           <small>AI Workspace</small>
         </span>
       </div>

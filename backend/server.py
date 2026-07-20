@@ -14,6 +14,7 @@ from backend.api.obsidian_routes import obsidian_bp
 from backend.api.verbindungen_routes import verbindungen_bp
 from backend.api.n8n_routes import n8n_bp
 from backend.api.access_requests_routes import access_requests_bp
+from backend.api.telephony_routes import telephony_bp
 from backend.api.logging_middleware import register_logging_middleware
 from backend.config import (
     CORS_ORIGINS,
@@ -50,6 +51,7 @@ def create_app() -> Flask:
     app.register_blueprint(obsidian_bp, url_prefix="/api/obsidian")
     app.register_blueprint(verbindungen_bp, url_prefix="/api/verbindungen")
     app.register_blueprint(n8n_bp, url_prefix="/api/n8n")
+    app.register_blueprint(telephony_bp, url_prefix="/api/telephony")
     # Public blueprint – no auth guard (intentional, see access_requests_routes.py)
     app.register_blueprint(access_requests_bp, url_prefix="/api/access-requests")
 

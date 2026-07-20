@@ -11,6 +11,11 @@ venv/
 frontend/node_modules/
 frontend/dist/
 
+# Voice stack (built via its own build context ./voice, not the main image)
+voice/.venv/
+voice/**/__pycache__/
+voice/data/phonebook.json
+
 # Local data & logs (mounted as volumes at runtime)
 data/
 log.txt

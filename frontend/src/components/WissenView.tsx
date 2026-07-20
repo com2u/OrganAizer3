@@ -574,7 +574,7 @@ function FloatingEditor({ path, onClose }: FloatingEditorProps) {
 
 export default function WissenView() {
   const { t } = useTheme()
-  const [activeTab, setActiveTab] = useState<Tab>('search')
+  const [activeTab, setActiveTab] = useState<Tab>('navigation')
   const [floatingNote, setFloatingNote] = useState<string | null>(null)
 
   const openNote = (path: string) => {
@@ -597,11 +597,11 @@ export default function WissenView() {
       </header>
 
       <div className="wissen-tabs">
-        <button className={`tab-btn${activeTab === 'search' ? ' active' : ''}`} onClick={() => setActiveTab('search')}>
-          <Search size={14} /> {t('wissen.search')}
-        </button>
         <button className={`tab-btn${activeTab === 'navigation' ? ' active' : ''}`} onClick={() => setActiveTab('navigation')}>
           <FolderOpen size={14} /> {t('wissen.navigation')}
+        </button>
+        <button className={`tab-btn${activeTab === 'search' ? ' active' : ''}`} onClick={() => setActiveTab('search')}>
+          <Search size={14} /> {t('wissen.search')}
         </button>
         <button className={`tab-btn${activeTab === 'tags' ? ' active' : ''}`} onClick={() => setActiveTab('tags')}>
           <Tag size={14} /> {t('wissen.tags')}

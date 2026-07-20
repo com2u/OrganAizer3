@@ -1,0 +1,23 @@
+# LiveKit SIP service configuration.
+# Receives Twilio's inbound SIP INVITE on port 5060 and bridges the call into
+# a LiveKit room (where the OrganAIzer agent joins).
+api_key: devkey
+api_secret: secret
+
+# Internal connection to the LiveKit server (host networking -> localhost).
+ws_url: ws://localhost:7880
+
+redis:
+  address: localhost:6379
+
+# SIP signalling port Twilio's Origination URI targets (sip:ai-servre.org:5060).
+sip_port: 5060
+
+# RTP media port range (must be open in the firewall, UDP).
+rtp_port: 10000-20000
+
+# Advertise the server's public IP for media so audio flows from the internet.
+use_external_ip: true
+
+logging:
+  level: info

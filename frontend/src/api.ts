@@ -1,4 +1,4 @@
-import { Appointment, TerminDetail, Bereich, Usergruppe, Intervall, User, SipConfig, Call, CallDetail, VoiceResponse, TTSResponse, STTResponse, YouTubeResponse, OCRResponse, HermesExecuteResponse, Person, Rolle, Raum, Komponente, Gruppe, TerminDef, Planungsregel, Planungsauftrag, Abhaengigkeit } from './types'
+import { Appointment, TerminDetail, Bereich, Usergruppe, Intervall, User, TelephonyConfig, TelephonyStatus, WebToken, Call, CallDetail, PhonebookContact, VoiceResponse, TTSResponse, STTResponse, YouTubeResponse, OCRResponse, HermesExecuteResponse, Person, Rolle, Raum, Komponente, Gruppe, GruppenMitglied, TerminDef, Planungsregel, Planungsauftrag, Abhaengigkeit } from './types'
 import { logApi } from './logging'
 
 // Configurable at build time via VITE_API_BASE.
@@ -151,13 +151,13 @@ export async function exportExcel(): Promise<void> {
 
 // ===== Telephony =====
 
-export async function fetchSipConfig(): Promise<SipConfig> {
+export async function fetchTelephonyConfig(): Promise<TelephonyConfig> {
   const res = await apiFetch('/telephony/config')
-  if (!res.ok) throw new Error('Failed to fetch SIP config')
+  if (!res.ok) throw new Error('Failed to fetch telephony config')
   return res.json()
 }
 
-export async function saveSipConfig(config: Partial<SipConfig> & { sip_password?: string }): Promise<SipConfig> {
+export async function saveTelephonyConfig(config: Record<string, unknown>): Promise<TelephonyConfig> {
   const res = await apiFetch('/telephony/config', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -165,9 +165,22 @@ export async function saveSipConfig(config: Partial<SipConfig> & { sip_password?
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
-    throw new Error(err.error || 'Failed to save SIP config')
+    throw new Error(err.error || 'Failed to save telephony config')
   }
   return res.json()
+}
+
+export async function fetchTelephonyStatus(): Promise<TelephonyStatus> {
+  const res = await apiFetch('/telephony/status')
+  if (!res.ok) throw new Error('Failed to fetch telephony status')
+  return res.json()
+}
+
+export async function fetchWebToken(): Promise<WebToken> {
+  const res = await apiFetch('/telephony/web-token')
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Failed to obtain web token')
+  return data
 }
 
 export async function fetchCalls(): Promise<Call[]> {
@@ -212,6 +225,35 @@ export async function sendVoiceMessage(message: string, callId?: number): Promis
     throw new Error(data.error || 'Voice message failed')
   }
   return data
+}
+
+export async function fetchPhonebook(): Promise<PhonebookContact[]> {
+  const res = await apiFetch('/telephony/phonebook')
+  if (!res.ok) throw new Error('Failed to fetch phonebook')
+  return res.json()
+}
+
+export async function savePhonebookContact(
+  contact: { number: string; name: string; notes: string[]; original_number?: string }
+): Promise<PhonebookContact> {
+  const res = await apiFetch('/telephony/phonebook', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(contact),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Failed to save contact')
+  return data
+}
+
+export async function deletePhonebookContact(number: string): Promise<void> {
+  const res = await apiFetch(`/telephony/phonebook/${encodeURIComponent(number)}`, {
+    method: 'DELETE',
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.error || 'Failed to delete contact')
+  }
 }
 
 // ===== TTS / STT / YouTube / OCR / Hermes =====
@@ -311,7 +353,17 @@ export const updateKomponente = (id: number, k: Partial<Komponente>) => _resourc
 export const deleteKomponente = (id: number) => _resourceCrud<{ status: string }>('/komponenten', `/${id}`, { method: 'DELETE' })
 
 export const fetchGruppen = () => _resourceCrud<Gruppe[]>('/gruppen', '')
+export const createGruppe = (g: { gruppe: string; bereich: string }) => _resourceCrud<Gruppe>('/gruppen', '', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(g) })
+export const updateGruppe = (gruppe: string, g: { bereich: string }) => _resourceCrud<Gruppe>('/gruppen', `/${encodeURIComponent(gruppe)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(g) })
+export const deleteGruppe = (gruppe: string) => _resourceCrud<{ status: string }>('/gruppen', `/${encodeURIComponent(gruppe)}`, { method: 'DELETE' })
+export const createMitglied = (gruppe: string, m: { nummer: string; bezeichnung: string; name?: string }) => _resourceCrud<GruppenMitglied>('/gruppen', `/${encodeURIComponent(gruppe)}/mitglieder`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(m) })
+export const updateMitglied = (nummer: string, m: { bezeichnung: string; name?: string }) => _resourceCrud<GruppenMitglied>('/mitglieder', `/${encodeURIComponent(nummer)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(m) })
+export const deleteMitglied = (nummer: string) => _resourceCrud<{ status: string }>('/mitglieder', `/${encodeURIComponent(nummer)}`, { method: 'DELETE' })
+
 export const fetchResourceTermine = () => _resourceCrud<TerminDef[]>('/termine', '')
+export const createTermin = (tr: { bezeichnung: string; intervall: string; dauer_min: number; bespr_nr?: number }) => _resourceCrud<TerminDef>('/termine', '', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(tr) })
+export const updateTermin = (nr: number, tr: { bezeichnung: string; intervall: string; dauer_min: number }) => _resourceCrud<TerminDef>('/termine', `/${nr}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(tr) })
+export const deleteTermin = (nr: number) => _resourceCrud<{ status: string }>('/termine', `/${nr}`, { method: 'DELETE' })
 
 // ===== Planning =====
 

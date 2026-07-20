@@ -41,9 +41,9 @@ test.describe('Login Flow', () => {
     await expect(sharedPage.locator('nav').getByText('admin')).toBeVisible()
   })
 
-  test('version v0.1.5 shown in sidebar', async () => {
+  test('version v0.1.7 shown in sidebar', async () => {
     // Already logged in
-    await expect(sharedPage.locator('nav').getByText('v0.1.5')).toBeVisible()
+    await expect(sharedPage.locator('nav').getByText('v0.1.7')).toBeVisible()
   })
 
   test('logout returns to landing page', async () => {

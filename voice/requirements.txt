@@ -1,0 +1,5 @@
+# Core runtime
+livekit-agents[openai]~=1.2
+livekit-api~=1.0
+python-dotenv~=1.0
+aiohttp~=3.9

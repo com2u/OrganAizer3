@@ -4,6 +4,8 @@ import logging
 
 from flask import Blueprint, jsonify, request
 
+import sqlite3
+
 from backend import auth
 from backend.config import DB_PATH
 from backend.db.sqlite_adapter import SQLiteAdapter
@@ -384,6 +386,123 @@ def list_gruppen():
         db.disconnect()
 
 
+def _gruppe_with_members(db: SQLiteAdapter, gruppe: str) -> dict | None:
+    row = db.fetchone("SELECT gruppe, bereich FROM bereiche WHERE gruppe = ?", (gruppe,))
+    if not row:
+        return None
+    members = db.fetchall(
+        "SELECT nummer, bezeichnung, name FROM usergruppen WHERE bereich = ? ORDER BY nummer",
+        (gruppe,),
+    )
+    return {**row, "mitglieder": members}
+
+
+@resources_bp.route("/gruppen", methods=["POST"])
+def create_gruppe():
+    body = request.get_json(silent=True) or {}
+    gruppe = (body.get("gruppe") or "").strip()
+    bereich = (body.get("bereich") or "").strip()
+    if not gruppe or not bereich:
+        return jsonify({"error": "Gruppe (Kürzel) und Bereich sind erforderlich"}), 400
+    db = _get_db()
+    try:
+        if db.fetchone("SELECT gruppe FROM bereiche WHERE gruppe = ?", (gruppe,)):
+            return jsonify({"error": "Diese Gruppe existiert bereits"}), 409
+        db.execute("INSERT INTO bereiche (gruppe, bereich) VALUES (?, ?)", (gruppe, bereich))
+        return jsonify(_gruppe_with_members(db, gruppe)), 201
+    finally:
+        db.disconnect()
+
+
+@resources_bp.route("/gruppen/<gruppe>", methods=["PUT"])
+def update_gruppe(gruppe: str):
+    body = request.get_json(silent=True) or {}
+    bereich = (body.get("bereich") or "").strip()
+    if not bereich:
+        return jsonify({"error": "Bereich ist erforderlich"}), 400
+    db = _get_db()
+    try:
+        if not db.fetchone("SELECT gruppe FROM bereiche WHERE gruppe = ?", (gruppe,)):
+            return jsonify({"error": "Gruppe nicht gefunden"}), 404
+        db.execute("UPDATE bereiche SET bereich = ? WHERE gruppe = ?", (bereich, gruppe))
+        return jsonify(_gruppe_with_members(db, gruppe))
+    finally:
+        db.disconnect()
+
+
+@resources_bp.route("/gruppen/<gruppe>", methods=["DELETE"])
+def delete_gruppe(gruppe: str):
+    db = _get_db()
+    try:
+        if not db.fetchone("SELECT gruppe FROM bereiche WHERE gruppe = ?", (gruppe,)):
+            return jsonify({"error": "Gruppe nicht gefunden"}), 404
+        try:
+            db.execute("DELETE FROM bereiche WHERE gruppe = ?", (gruppe,))
+        except sqlite3.IntegrityError:
+            return jsonify({"error": "Gruppe hat noch Mitglieder und kann nicht gelöscht werden"}), 409
+        return jsonify({"status": "ok"})
+    finally:
+        db.disconnect()
+
+
+# ===== Gruppen-Mitglieder (usergruppen) =====
+
+@resources_bp.route("/gruppen/<gruppe>/mitglieder", methods=["POST"])
+def create_mitglied(gruppe: str):
+    body = request.get_json(silent=True) or {}
+    nummer = (body.get("nummer") or "").strip()
+    bezeichnung = (body.get("bezeichnung") or "").strip()
+    if not nummer or not bezeichnung:
+        return jsonify({"error": "Nummer und Bezeichnung sind erforderlich"}), 400
+    db = _get_db()
+    try:
+        if not db.fetchone("SELECT gruppe FROM bereiche WHERE gruppe = ?", (gruppe,)):
+            return jsonify({"error": "Gruppe nicht gefunden"}), 404
+        if db.fetchone("SELECT nummer FROM usergruppen WHERE nummer = ?", (nummer,)):
+            return jsonify({"error": "Diese Nummer existiert bereits"}), 409
+        db.execute(
+            "INSERT INTO usergruppen (nummer, bereich, bezeichnung, name) VALUES (?, ?, ?, ?)",
+            (nummer, gruppe, bezeichnung, body.get("name") or None),
+        )
+        return jsonify(db.fetchone("SELECT nummer, bezeichnung, name FROM usergruppen WHERE nummer = ?", (nummer,))), 201
+    finally:
+        db.disconnect()
+
+
+@resources_bp.route("/mitglieder/<nummer>", methods=["PUT"])
+def update_mitglied(nummer: str):
+    body = request.get_json(silent=True) or {}
+    bezeichnung = (body.get("bezeichnung") or "").strip()
+    if not bezeichnung:
+        return jsonify({"error": "Bezeichnung ist erforderlich"}), 400
+    db = _get_db()
+    try:
+        if not db.fetchone("SELECT nummer FROM usergruppen WHERE nummer = ?", (nummer,)):
+            return jsonify({"error": "Mitglied nicht gefunden"}), 404
+        db.execute(
+            "UPDATE usergruppen SET bezeichnung = ?, name = ? WHERE nummer = ?",
+            (bezeichnung, body.get("name") or None, nummer),
+        )
+        return jsonify(db.fetchone("SELECT nummer, bezeichnung, name FROM usergruppen WHERE nummer = ?", (nummer,)))
+    finally:
+        db.disconnect()
+
+
+@resources_bp.route("/mitglieder/<nummer>", methods=["DELETE"])
+def delete_mitglied(nummer: str):
+    db = _get_db()
+    try:
+        if not db.fetchone("SELECT nummer FROM usergruppen WHERE nummer = ?", (nummer,)):
+            return jsonify({"error": "Mitglied nicht gefunden"}), 404
+        try:
+            db.execute("DELETE FROM usergruppen WHERE nummer = ?", (nummer,))
+        except sqlite3.IntegrityError:
+            return jsonify({"error": "Mitglied wird noch verwendet und kann nicht gelöscht werden"}), 409
+        return jsonify({"status": "ok"})
+    finally:
+        db.disconnect()
+
+
 # ===== Termine (compatible read/write over existing termine/terminliste) =====
 
 @resources_bp.route("/termine", methods=["GET"])
@@ -399,5 +518,93 @@ def list_termine():
                ORDER BY t.bespr_nr"""
         )
         return jsonify(rows)
+    finally:
+        db.disconnect()
+
+
+def _termin_with_intervall(db: SQLiteAdapter, nr: int) -> dict | None:
+    return db.fetchone(
+        """SELECT t.bespr_nr, t.bezeichnung, t.intervall, t.dauer_min,
+                  i.bedeutung as intervall_text
+           FROM termine t
+           LEFT JOIN intervalle i ON t.intervall = i.kuerzel
+           WHERE t.bespr_nr = ?""",
+        (nr,),
+    )
+
+
+@resources_bp.route("/termine", methods=["POST"])
+def create_termin():
+    body = request.get_json(silent=True) or {}
+    bezeichnung = (body.get("bezeichnung") or "").strip()
+    intervall = (body.get("intervall") or "").strip()
+    if not bezeichnung or not intervall:
+        return jsonify({"error": "Bezeichnung und Intervall sind erforderlich"}), 400
+    try:
+        dauer_min = int(body.get("dauer_min"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Dauer (Minuten) muss eine Zahl sein"}), 400
+    db = _get_db()
+    try:
+        bespr_nr = body.get("bespr_nr")
+        if bespr_nr in (None, ""):
+            row = db.fetchone("SELECT MAX(bespr_nr) AS m FROM termine")
+            bespr_nr = (row["m"] or 0) + 1 if row else 1
+        else:
+            try:
+                bespr_nr = int(bespr_nr)
+            except (TypeError, ValueError):
+                return jsonify({"error": "Besprechungsnummer muss eine Zahl sein"}), 400
+            if db.fetchone("SELECT bespr_nr FROM termine WHERE bespr_nr = ?", (bespr_nr,)):
+                return jsonify({"error": "Diese Besprechungsnummer existiert bereits"}), 409
+        if not db.fetchone("SELECT kuerzel FROM intervalle WHERE kuerzel = ?", (intervall,)):
+            return jsonify({"error": "Unbekanntes Intervall"}), 400
+        db.execute(
+            "INSERT INTO termine (bespr_nr, bezeichnung, intervall, dauer_min) VALUES (?, ?, ?, ?)",
+            (bespr_nr, bezeichnung, intervall, dauer_min),
+        )
+        return jsonify(_termin_with_intervall(db, bespr_nr)), 201
+    finally:
+        db.disconnect()
+
+
+@resources_bp.route("/termine/<int:nr>", methods=["PUT"])
+def update_termin(nr: int):
+    body = request.get_json(silent=True) or {}
+    bezeichnung = (body.get("bezeichnung") or "").strip()
+    intervall = (body.get("intervall") or "").strip()
+    if not bezeichnung or not intervall:
+        return jsonify({"error": "Bezeichnung und Intervall sind erforderlich"}), 400
+    try:
+        dauer_min = int(body.get("dauer_min"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Dauer (Minuten) muss eine Zahl sein"}), 400
+    db = _get_db()
+    try:
+        if not db.fetchone("SELECT bespr_nr FROM termine WHERE bespr_nr = ?", (nr,)):
+            return jsonify({"error": "Termin nicht gefunden"}), 404
+        if not db.fetchone("SELECT kuerzel FROM intervalle WHERE kuerzel = ?", (intervall,)):
+            return jsonify({"error": "Unbekanntes Intervall"}), 400
+        db.execute(
+            "UPDATE termine SET bezeichnung = ?, intervall = ?, dauer_min = ? WHERE bespr_nr = ?",
+            (bezeichnung, intervall, dauer_min, nr),
+        )
+        return jsonify(_termin_with_intervall(db, nr))
+    finally:
+        db.disconnect()
+
+
+@resources_bp.route("/termine/<int:nr>", methods=["DELETE"])
+def delete_termin(nr: int):
+    db = _get_db()
+    try:
+        if not db.fetchone("SELECT bespr_nr FROM termine WHERE bespr_nr = ?", (nr,)):
+            return jsonify({"error": "Termin nicht gefunden"}), 404
+        db.execute("DELETE FROM termin_teilnehmer WHERE bespr_nr = ?", (nr,))
+        try:
+            db.execute("DELETE FROM termine WHERE bespr_nr = ?", (nr,))
+        except sqlite3.IntegrityError:
+            return jsonify({"error": "Termin ist noch verplant und kann nicht gelöscht werden"}), 409
+        return jsonify({"status": "ok"})
     finally:
         db.disconnect()
