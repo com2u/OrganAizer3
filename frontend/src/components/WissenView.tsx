@@ -4,15 +4,18 @@ import { useTheme } from '../ThemeContext'
 import {
   Search, Clock, Tag, Loader2, FolderOpen, ChevronRight, ChevronDown,
   File, Folder, RefreshCw, Save, AlertTriangle, ArrowUpDown, ArrowUp, ArrowDown,
+  LibraryBig, Plus, ExternalLink, ShieldCheck, Sparkles,
 } from 'lucide-react'
 import {
   fetchObsidianTree, searchObsidian, fetchObsidianTags, fetchObsidianRecent,
   fetchObsidianNote, saveObsidianNote,
   ObsidianTreeNode, ObsidianDirNode,
   ObsidianSearchResult, ObsidianTag, ObsidianNote,
+  fetchOpenNotebookStatus, fetchResearchNotebooks, createResearchNotebook,
+  OpenNotebookStatus, ResearchNotebook,
 } from '../api'
 
-type Tab = 'search' | 'navigation' | 'tags' | 'recent'
+type Tab = 'search' | 'navigation' | 'tags' | 'recent' | 'research'
 
 // ── Editor ────────────────────────────────────────────────────────────────────
 
@@ -570,6 +573,126 @@ function FloatingEditor({ path, onClose }: FloatingEditorProps) {
   )
 }
 
+function ResearchNotebooksTab() {
+  const { t } = useTheme()
+  const [status, setStatus] = useState<OpenNotebookStatus | null>(null)
+  const [notebooks, setNotebooks] = useState<ResearchNotebook[]>([])
+  const [loading, setLoading] = useState(true)
+  const [creating, setCreating] = useState(false)
+  const [showForm, setShowForm] = useState(false)
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const nextStatus = await fetchOpenNotebookStatus()
+      setStatus(nextStatus)
+      if (nextStatus.available) setNotebooks(await fetchResearchNotebooks())
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const create = async () => {
+    if (!name.trim()) return
+    setCreating(true)
+    setError(null)
+    try {
+      await createResearchNotebook(name.trim(), description.trim())
+      setName('')
+      setDescription('')
+      setShowForm(false)
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  return (
+    <div className="research-workspace">
+      <div className="research-hero">
+        <div>
+          <span className="research-eyebrow"><Sparkles size={14} /> {t('wissen.researchGrounded')}</span>
+          <h3>{t('wissen.researchTitle')}</h3>
+          <p>{t('wissen.researchIntro')}</p>
+        </div>
+        <div className={`service-pill ${status?.available ? 'online' : 'offline'}`}>
+          <span className="service-dot" />
+          {loading ? t('wissen.loading') : status?.available ? t('wissen.researchReady') : t('wissen.researchOffline')}
+        </div>
+      </div>
+
+      <div className="research-actions">
+        <button className="primary-btn" onClick={() => setShowForm(true)} disabled={!status?.available}>
+          <Plus size={15} /> {t('wissen.researchNew')}
+        </button>
+        <button className="secondary-btn" onClick={load} disabled={loading}>
+          <RefreshCw size={14} className={loading ? 'spin' : ''} /> {t('wissen.reload')}
+        </button>
+        {status?.public_url && (
+          <a className="secondary-btn" href={status.public_url} target="_blank" rel="noreferrer">
+            <ExternalLink size={14} /> {t('wissen.researchStudio')}
+          </a>
+        )}
+      </div>
+
+      {error && <div className="wissen-error"><AlertTriangle size={14} /> {error}</div>}
+      {!loading && !status?.available && (
+        <div className="research-offline-card">
+          <AlertTriangle size={20} />
+          <div><strong>{t('wissen.researchOfflineTitle')}</strong><p>{t('wissen.researchOfflineHint')}</p></div>
+        </div>
+      )}
+
+      {showForm && (
+        <div className="research-create-card">
+          <label>{t('wissen.researchName')}<input autoFocus value={name} onChange={e => setName(e.target.value)} maxLength={160} /></label>
+          <label>{t('wissen.researchDescription')}<textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} maxLength={2000} /></label>
+          <div className="modal-actions">
+            <button className="secondary-btn" onClick={() => setShowForm(false)}>{t('cancel')}</button>
+            <button className="primary-btn" onClick={create} disabled={!name.trim() || creating}>
+              {creating && <Loader2 size={14} className="spin" />} {t('wissen.researchCreate')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {status?.available && !loading && notebooks.length === 0 && !showForm && (
+        <div className="research-empty">
+          <LibraryBig size={32} />
+          <h4>{t('wissen.researchEmpty')}</h4>
+          <p>{t('wissen.researchEmptyHint')}</p>
+        </div>
+      )}
+      <div className="research-grid">
+        {notebooks.map(notebook => (
+          <article className="research-card" key={notebook.id}>
+            <div className="research-card-icon"><LibraryBig size={20} /></div>
+            <div><h4>{notebook.name}</h4><p>{notebook.description || t('wissen.researchNoDescription')}</p></div>
+            {status?.public_url && <a href={status.public_url} target="_blank" rel="noreferrer" aria-label={notebook.name}><ExternalLink size={16} /></a>}
+          </article>
+        ))}
+      </div>
+
+      <div className="research-capabilities">
+        <span><ShieldCheck size={16} /> {t('wissen.researchPrivate')}</span>
+        <span>{t('wissen.researchSources')}</span>
+        <span>{t('wissen.researchChat')}</span>
+        <span>{t('wissen.researchAudio')}</span>
+      </div>
+    </div>
+  )
+}
+
 // ── Main WissenView ───────────────────────────────────────────────────────────
 
 export default function WissenView() {
@@ -609,6 +732,9 @@ export default function WissenView() {
         <button className={`tab-btn${activeTab === 'recent' ? ' active' : ''}`} onClick={() => setActiveTab('recent')}>
           <Clock size={14} /> {t('wissen.recent')}
         </button>
+        <button className={`tab-btn${activeTab === 'research' ? ' active' : ''}`} onClick={() => setActiveTab('research')}>
+          <LibraryBig size={14} /> {t('wissen.research')}
+        </button>
       </div>
 
       <div className="wissen-tab-content">
@@ -616,6 +742,7 @@ export default function WissenView() {
         {activeTab === 'navigation' && <NavigationTab />}
         {activeTab === 'tags' && <TagsTab onOpenNote={openNote} />}
         {activeTab === 'recent' && <RecentTab onOpenNote={openNote} />}
+        {activeTab === 'research' && <ResearchNotebooksTab />}
       </div>
 
       {floatingNote && (

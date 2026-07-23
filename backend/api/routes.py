@@ -372,13 +372,38 @@ def import_data():
         import_db = get_db()
         try:
             import_db.create_tables()
-            import_excel(import_db, tmp_path)
+            import_excel(
+                import_db,
+                tmp_path,
+                allow_invalid=request.form.get("confirm_invalid", "").lower() == "true",
+            )
         finally:
             import_db.disconnect()
         return jsonify({"status": "ok", "message": "Import successful"})
     except Exception as e:
         logger.exception("Import failed")
         return jsonify({"error": str(e)}), 500
+    finally:
+        os.unlink(tmp_path)
+
+
+@api_bp.route("/import/validate", methods=["POST"])
+def validate_import_data():
+    if "file" not in request.files:
+        return jsonify({"error": "No file provided"}), 400
+    file = request.files["file"]
+    if not file.filename or not file.filename.endswith(".xlsx"):
+        return jsonify({"error": "File must be .xlsx"}), 400
+    with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
+        file.save(tmp.name)
+        tmp_path = tmp.name
+    try:
+        from backend.services.import_service import validate_excel
+        issues = validate_excel(tmp_path)
+        return jsonify({"valid": not issues, "issues": issues})
+    except Exception as exc:
+        logger.exception("Import validation failed")
+        return jsonify({"error": str(exc)}), 400
     finally:
         os.unlink(tmp_path)
 

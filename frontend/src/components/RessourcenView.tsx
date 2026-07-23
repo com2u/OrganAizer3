@@ -80,6 +80,52 @@ function DeleteConfirm({ onConfirm, onCancel, t: _t }: { onConfirm: () => void; 
   )
 }
 
+type AssignmentItem = { id: string; label: string; detail?: string }
+
+function AssignmentPicker({ title, available, selected, onChange }: {
+  title: string
+  available: AssignmentItem[]
+  selected: string[]
+  onChange: (ids: string[]) => void
+}) {
+  const add = (id: string) => id && !selected.includes(id) && onChange([...selected, id])
+  const remove = (id: string) => onChange(selected.filter(value => value !== id))
+  return (
+    <div className="participant-picker assignment-picker">
+      <div className="participant-column">
+        <h4>Verfügbare {title}</h4>
+        <p className="text-secondary">Per Drag-and-drop oder Klick hinzufügen.</p>
+        <div className="participant-list">
+          {available.filter(item => !selected.includes(item.id)).map(item => (
+            <button key={item.id} type="button" className="participant-chip" draggable
+              onDragStart={event => event.dataTransfer.setData('text/plain', item.id)}
+              onClick={() => add(item.id)}>
+              <GripVertical size={14} /><span>{item.label}<small>{item.detail || item.id}</small></span>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="participant-column participant-selected"
+        onDragOver={event => event.preventDefault()}
+        onDrop={event => { event.preventDefault(); add(event.dataTransfer.getData('text/plain')) }}>
+        <h4>Zugeordnete {title}</h4>
+        <p className="text-secondary">{selected.length} ausgewählt</p>
+        <div className="participant-list">
+          {selected.map(id => {
+            const item = available.find(candidate => candidate.id === id)
+            return (
+              <button key={id} type="button" className="participant-chip selected" onClick={() => remove(id)}>
+                <GripVertical size={14} /><span>{item?.label || id}<small>{item?.detail || id}</small></span><X size={14} />
+              </button>
+            )
+          })}
+          {!selected.length && <div className="participant-drop-hint">{title} hier ablegen</div>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ===== Personen =====
 
 function PersonenTab() {
@@ -123,7 +169,7 @@ function PersonenTab() {
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('res.search')} />
           {search && <button className="btn-icon" onClick={() => setSearch('')}><X size={14} /></button>}
         </div>
-        <button className="btn btn-primary" onClick={() => setEditing({ vorname: '', nachname: '', email: '', telefon: '', aktiv: 1 })}>
+        <button className="btn btn-primary" onClick={() => setEditing({ vorname: '', nachname: '', email: '', telefon: '', standort: '', aktiv: 1 })}>
           <Plus size={16} /> {t('res.add')}
         </button>
       </div>
@@ -137,6 +183,7 @@ function PersonenTab() {
             <label>{t('res.nachname')}<input value={editing.nachname || ''} onChange={e => setEditing({ ...editing, nachname: e.target.value })} /></label>
             <label>{t('res.email')}<input value={editing.email || ''} onChange={e => setEditing({ ...editing, email: e.target.value })} /></label>
             <label>{t('res.telefon')}<input value={editing.telefon || ''} onChange={e => setEditing({ ...editing, telefon: e.target.value })} /></label>
+            <label>Standort<input value={editing.standort || ''} onChange={e => setEditing({ ...editing, standort: e.target.value })} /></label>
           </div>
           <div className="form-actions">
             <button className="btn btn-primary" onClick={save}>{t('res.save')}</button>
@@ -154,6 +201,7 @@ function PersonenTab() {
                 <th>{t('res.nachname')}</th>
                 <th>{t('res.email')}</th>
                 <th>{t('res.telefon')}</th>
+                <th>Standort</th>
                 <th></th>
               </tr>
             </thead>
@@ -164,6 +212,7 @@ function PersonenTab() {
                   <td>{p.nachname}</td>
                   <td>{p.email}</td>
                   <td>{p.telefon}</td>
+                  <td>{p.standort || '-'}</td>
                   <td className="actions">
                     {deleting === p.id ? (
                       <DeleteConfirm onConfirm={() => remove(p.id)} onCancel={() => setDeleting(null)} t={t} />
@@ -317,6 +366,8 @@ function GruppenTab() {
 function RollenTab() {
   const { t } = useTheme()
   const [items, setItems] = useState<Rolle[]>([])
+  const [personen, setPersonen] = useState<Person[]>([])
+  const [gruppen, setGruppen] = useState<Gruppe[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editing, setEditing] = useState<Partial<Rolle> | null>(null)
@@ -324,7 +375,10 @@ function RollenTab() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    try { setItems(await fetchRollen()); setError('') }
+    try {
+      const [roles, people, groupRows] = await Promise.all([fetchRollen(), fetchPersonen(), fetchGruppen()])
+      setItems(roles); setPersonen(people); setGruppen(groupRows); setError('')
+    }
     catch (e: any) { setError(e.message) }
     finally { setLoading(false) }
   }, [])
@@ -349,7 +403,7 @@ function RollenTab() {
     <div className="resource-panel">
       <div className="resource-toolbar">
         <div />
-        <button className="btn btn-primary" onClick={() => setEditing({ bezeichnung: '', beschreibung: '', farbe: '#71717a' })}>
+        <button className="btn btn-primary" onClick={() => setEditing({ bezeichnung: '', beschreibung: '', farbe: '#71717a', person_ids: [], gruppen_ids: [] })}>
           <Plus size={16} /> {t('res.add')}
         </button>
       </div>
@@ -361,6 +415,22 @@ function RollenTab() {
             <label>{t('res.beschreibung')}<textarea value={editing.beschreibung || ''} onChange={e => setEditing({ ...editing, beschreibung: e.target.value })} /></label>
             <label>{t('res.farbe')}<input type="color" value={editing.farbe || '#71717a'} onChange={e => setEditing({ ...editing, farbe: e.target.value })} /></label>
           </div>
+          <AssignmentPicker
+            title="Personen"
+            available={personen.map(person => ({ id: String(person.id), label: `${person.vorname} ${person.nachname}`, detail: person.standort || person.email }))}
+            selected={(editing.person_ids || []).map(String)}
+            onChange={ids => setEditing({ ...editing, person_ids: ids.map(Number) })}
+          />
+          <AssignmentPicker
+            title="Gruppen"
+            available={gruppen.flatMap(group => group.mitglieder.map(member => ({
+              id: member.nummer,
+              label: member.bezeichnung,
+              detail: `${group.bereich} · ${member.nummer}`,
+            })))}
+            selected={editing.gruppen_ids || []}
+            onChange={ids => setEditing({ ...editing, gruppen_ids: ids })}
+          />
           <div className="form-actions">
             <button className="btn btn-primary" onClick={save}>{t('res.save')}</button>
             <button className="btn btn-ghost" onClick={() => setEditing(null)}>{t('res.cancel')}</button>
@@ -569,6 +639,8 @@ function TermineTab() {
   const [items, setItems] = useState<TerminDef[]>([])
   const [intervalle, setIntervalle] = useState<Intervall[]>([])
   const [gruppen, setGruppen] = useState<Gruppe[]>([])
+  const [raeume, setRaeume] = useState<Raum[]>([])
+  const [komponenten, setKomponenten] = useState<Komponente[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editing, setEditing] = useState<Partial<TerminDef> & { isNew?: boolean } | null>(null)
@@ -577,8 +649,10 @@ function TermineTab() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [rows, iv, groupRows] = await Promise.all([fetchResourceTermine(), fetchIntervalle(), fetchGruppen()])
-      setItems(rows); setIntervalle(iv); setGruppen(groupRows); setError('')
+      const [rows, iv, groupRows, roomRows, componentRows] = await Promise.all([
+        fetchResourceTermine(), fetchIntervalle(), fetchGruppen(), fetchRaeume(), fetchKomponenten(),
+      ])
+      setItems(rows); setIntervalle(iv); setGruppen(groupRows); setRaeume(roomRows); setKomponenten(componentRows); setError('')
     } catch (e: any) { setError(e.message) }
     finally { setLoading(false) }
   }, [])
@@ -592,6 +666,8 @@ function TermineTab() {
       intervall: editing.intervall || '',
       dauer_min: Number(editing.dauer_min) || 0,
       teilnehmer: editing.teilnehmer || [],
+      raum_ids: editing.raum_ids || [],
+      komponenten_ids: editing.komponenten_ids || [],
     }
     try {
       if (editing.isNew) await createTermin(payload)
@@ -682,6 +758,18 @@ function TermineTab() {
               </div>
             </div>
           </div>
+          <AssignmentPicker
+            title="Räume"
+            available={raeume.map(room => ({ id: String(room.id), label: room.bezeichnung, detail: `${room.gebaeude || 'Ohne Gebäude'} · Kapazität ${room.kapazitaet}` }))}
+            selected={(editing.raum_ids || []).map(String)}
+            onChange={ids => setEditing({ ...editing, raum_ids: ids.map(Number) })}
+          />
+          <AssignmentPicker
+            title="Komponenten"
+            available={komponenten.map(component => ({ id: String(component.id), label: component.bezeichnung, detail: component.typ }))}
+            selected={(editing.komponenten_ids || []).map(String)}
+            onChange={ids => setEditing({ ...editing, komponenten_ids: ids.map(Number) })}
+          />
           <div className="form-actions">
             <button className="btn btn-primary" onClick={save}>{t('res.save')}</button>
             <button className="btn btn-ghost" onClick={() => setEditing(null)}>{t('res.cancel')}</button>

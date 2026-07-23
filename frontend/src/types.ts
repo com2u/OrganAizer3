@@ -184,6 +184,7 @@ export interface Person {
   nachname: string
   email: string
   telefon: string
+  standort: string
   usergruppe: string | null
   aktiv: number
   erstellt_am: string
@@ -197,6 +198,8 @@ export interface Rolle {
   beschreibung: string
   farbe: string
   erstellt_am: string
+  person_ids?: number[]
+  gruppen_ids?: string[]
 }
 
 export interface Raum {
@@ -237,6 +240,8 @@ export interface TerminDef {
   dauer_min: number
   intervall_text: string
   teilnehmer?: string[]
+  raum_ids?: number[]
+  komponenten_ids?: number[]
 }
 
 // ===== Planning =====

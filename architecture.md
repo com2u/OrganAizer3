@@ -1,5 +1,25 @@
 # OrganAIzer architecture
 
+## Open Notebook integration
+
+```text
+OrganAIzer browser
+  └─ Wissen / Recherche-Notebooks
+       └─ authenticated /api/open-notebook/*
+            └─ Flask Open Notebook bridge
+                 └─ private Docker network → Open Notebook REST API
+                      ├─ SurrealDB → data/open-notebook/surreal
+                      └─ source files → data/open-notebook/files
+```
+
+`WissenView.tsx` combines the fast Obsidian Markdown store with an entry point
+for deeper source-grounded research. `open_notebook_routes.py` validates
+OrganAIzer authentication, hides service credentials, normalizes failures, and
+forwards the native notebook surface. The Open Notebook v1 release channel owns
+multimodal ingestion, search, contextual chat, transformations, citations, and
+audio generation. Its separate SurrealDB deliberately avoids coupling the
+external application's schema to OrganAIzer's Supabase schema.
+
 ## Overview
 
 OrganAIzer is a containerized personal-organization platform that combines a React web application, a Flask API, a Supabase PostgreSQL database, workflow and knowledge integrations, and a LiveKit-based telephone/web voice assistant. The Flask backend remains the security and business-logic boundary: browsers never connect directly to PostgreSQL, while PostgREST is bound to localhost for administrative use. Persistent application data is mounted from the host so rebuilding or uploading containers does not replace the database, telephone book, call history, configuration, or n8n state.
@@ -112,7 +132,7 @@ OrganAizer3/
 │   │   ├── factory.py              # Chooses Supabase PostgreSQL or the SQLite fallback from configuration.
 │   │   ├── postgres_adapter.py      # Translates application SQL and executes it transactionally through psycopg.
 │   │   ├── sqlite_adapter.py        # Implements the same database contract for SQLite.
-│   │   └── models.py               # Defines application tables and dependency-safe clearing order.
+│   │   └── models.py               # Defines resource and assignment tables with dependency-safe clearing order.
 │   ├── services/
 │   │   ├── __init__.py             # Marks reusable backend services as a package.
 │   │   ├── import_service.py        # Imports schedule workbook data into the selected database.
@@ -158,7 +178,7 @@ OrganAizer3/
 │   │   │   ├── WeekSelector.tsx     # Selects the displayed calendar week.
 │   │   │   ├── FilterPanel.tsx      # Filters visible schedule entries.
 │   │   │   ├── AppointmentDetail.tsx # Displays details for a selected appointment.
-│   │   │   ├── RessourcenView.tsx   # Manages resources in modal editors and assigns meeting participants by drag-and-drop.
+│   │   │   ├── RessourcenView.tsx   # Manages resources and drag-and-drop assignments for meetings and roles.
 │   │   │   ├── PlanungView.tsx      # Manages rules and asynchronous AI planning jobs with progress polling.
 │   │   │   ├── SystemView.tsx       # Monitors backend CPU, RAM, and Docker container states.
 │   │   │   ├── TelefonieView.tsx    # Manages SIP settings, deletable calls, email-aware phonebook contacts, and the web telephone assistant.

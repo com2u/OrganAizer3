@@ -12,7 +12,7 @@ import {
 } from '../api'
 import type { TelephonyConfig, TelephonyStatus, Call, CallDetail, DialogEntry, PhonebookContact } from '../types'
 
-type Tab = 'voice' | 'history' | 'config'
+type Tab = 'voice' | 'history' | 'phonebook' | 'config'
 
 export default function TelefonieView() {
   const { t } = useTheme()
@@ -35,6 +35,9 @@ export default function TelefonieView() {
         <button className={`tab-btn ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>
           <List size={16} /> {t('telefonie.tab.history')}
         </button>
+        <button className={`tab-btn ${tab === 'phonebook' ? 'active' : ''}`} onClick={() => setTab('phonebook')}>
+          <BookUser size={16} /> {t('telefonie.pb.title')}
+        </button>
         <button className={`tab-btn ${tab === 'config' ? 'active' : ''}`} onClick={() => setTab('config')}>
           <Settings size={16} /> {t('telefonie.tab.config')}
         </button>
@@ -42,6 +45,7 @@ export default function TelefonieView() {
 
       {tab === 'voice' && <VoiceAssistant t={t} />}
       {tab === 'history' && <CallHistory t={t} />}
+      {tab === 'phonebook' && <PhonebookPanel t={t} />}
       {tab === 'config' && <GatewayConfig t={t} />}
     </section>
   )
@@ -513,8 +517,6 @@ function CallHistory({ t }: { t: (k: string) => string }) {
           )}
         </div>
       </div>
-
-      <PhonebookPanel t={t} />
     </div>
   )
 }

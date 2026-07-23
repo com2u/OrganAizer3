@@ -34,8 +34,8 @@ def list_personen():
         search = request.args.get("q", "").strip()
         if search:
             rows = db.fetchall(
-                "SELECT * FROM personen WHERE vorname LIKE ? OR nachname LIKE ? OR email LIKE ? ORDER BY nachname, vorname",
-                (f"%{search}%", f"%{search}%", f"%{search}%"),
+                "SELECT * FROM personen WHERE vorname LIKE ? OR nachname LIKE ? OR email LIKE ? OR standort LIKE ? ORDER BY nachname, vorname",
+                (f"%{search}%", f"%{search}%", f"%{search}%", f"%{search}%"),
             )
         else:
             rows = db.fetchall("SELECT * FROM personen ORDER BY nachname, vorname")
@@ -71,9 +71,9 @@ def create_person():
     db = _get_db()
     try:
         db.execute(
-            "INSERT INTO personen (vorname, nachname, email, telefon, usergruppe, aktiv) VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO personen (vorname, nachname, email, telefon, standort, usergruppe, aktiv) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (vorname, nachname, body.get("email", ""), body.get("telefon", ""),
-             body.get("usergruppe"), 1 if body.get("aktiv", True) else 0),
+             body.get("standort", ""), body.get("usergruppe"), 1 if body.get("aktiv", True) else 0),
         )
         row = db.fetchone("SELECT * FROM personen ORDER BY id DESC LIMIT 1")
         return jsonify(row), 201
@@ -94,9 +94,9 @@ def update_person(pid: int):
         if not existing:
             return jsonify({"error": "Person nicht gefunden"}), 404
         db.execute(
-            "UPDATE personen SET vorname=?, nachname=?, email=?, telefon=?, usergruppe=?, aktiv=?, aktualisiert_am=datetime('now') WHERE id=?",
+            "UPDATE personen SET vorname=?, nachname=?, email=?, telefon=?, standort=?, usergruppe=?, aktiv=?, aktualisiert_am=datetime('now') WHERE id=?",
             (vorname, nachname, body.get("email", ""), body.get("telefon", ""),
-             body.get("usergruppe"), 1 if body.get("aktiv", True) else 0, pid),
+             body.get("standort", ""), body.get("usergruppe"), 1 if body.get("aktiv", True) else 0, pid),
         )
         return jsonify(db.fetchone("SELECT * FROM personen WHERE id = ?", (pid,)))
     finally:
@@ -118,11 +118,52 @@ def delete_person(pid: int):
 
 # ===== Rollen =====
 
+def _enrich_rolle(db: DatabaseInterface, row: dict) -> dict:
+    row["person_ids"] = [
+        item["person_id"]
+        for item in db.fetchall("SELECT person_id FROM person_rollen WHERE rolle_id = ? ORDER BY person_id", (row["id"],))
+    ]
+    row["gruppen_ids"] = [
+        item["usergruppe"]
+        for item in db.fetchall("SELECT usergruppe FROM rolle_gruppen WHERE rolle_id = ? ORDER BY usergruppe", (row["id"],))
+    ]
+    return row
+
+
+def _validate_rolle_members(db: DatabaseInterface, body: dict):
+    person_ids = body.get("person_ids", [])
+    gruppen_ids = body.get("gruppen_ids", [])
+    if not isinstance(person_ids, list) or not isinstance(gruppen_ids, list):
+        return jsonify({"error": "Personen und Gruppen müssen Listen sein"}), 400
+    for person_id in person_ids:
+        if not db.fetchone("SELECT id FROM personen WHERE id = ?", (person_id,)):
+            return jsonify({"error": f"Unbekannte Person: {person_id}"}), 400
+    for gruppen_id in gruppen_ids:
+        if not db.fetchone("SELECT nummer FROM usergruppen WHERE nummer = ?", (gruppen_id,)):
+            return jsonify({"error": f"Unbekannte Gruppe: {gruppen_id}"}), 400
+    return None
+
+
+def _replace_rolle_members(db: DatabaseInterface, rid: int, body: dict):
+    error = _validate_rolle_members(db, body)
+    if error:
+        return error
+    db.execute("DELETE FROM person_rollen WHERE rolle_id = ?", (rid,))
+    db.execute("DELETE FROM rolle_gruppen WHERE rolle_id = ?", (rid,))
+    for person_id in dict.fromkeys(body.get("person_ids", [])):
+        db.execute("INSERT INTO person_rollen (person_id, rolle_id) VALUES (?, ?)", (person_id, rid))
+    for gruppen_id in dict.fromkeys(body.get("gruppen_ids", [])):
+        db.execute("INSERT INTO rolle_gruppen (rolle_id, usergruppe) VALUES (?, ?)", (rid, gruppen_id))
+    return None
+
+
 @resources_bp.route("/rollen", methods=["GET"])
 def list_rollen():
     db = _get_db()
     try:
         rows = db.fetchall("SELECT * FROM rollen ORDER BY bezeichnung")
+        for row in rows:
+            _enrich_rolle(db, row)
         return jsonify(rows)
     finally:
         db.disconnect()
@@ -135,7 +176,7 @@ def get_rolle(rid: int):
         row = db.fetchone("SELECT * FROM rollen WHERE id = ?", (rid,))
         if not row:
             return jsonify({"error": "Rolle nicht gefunden"}), 404
-        return jsonify(row)
+        return jsonify(_enrich_rolle(db, row))
     finally:
         db.disconnect()
 
@@ -153,7 +194,11 @@ def create_rolle():
             (bez, body.get("beschreibung", ""), body.get("farbe", "#71717a")),
         )
         row = db.fetchone("SELECT * FROM rollen ORDER BY id DESC LIMIT 1")
-        return jsonify(row), 201
+        error = _replace_rolle_members(db, row["id"], body)
+        if error:
+            db.execute("DELETE FROM rollen WHERE id = ?", (row["id"],))
+            return error
+        return jsonify(_enrich_rolle(db, row)), 201
     finally:
         db.disconnect()
 
@@ -169,11 +214,15 @@ def update_rolle(rid: int):
         existing = db.fetchone("SELECT id FROM rollen WHERE id = ?", (rid,))
         if not existing:
             return jsonify({"error": "Rolle nicht gefunden"}), 404
+        error = _validate_rolle_members(db, body)
+        if error:
+            return error
         db.execute(
             "UPDATE rollen SET bezeichnung=?, beschreibung=?, farbe=? WHERE id=?",
             (bez, body.get("beschreibung", ""), body.get("farbe", "#71717a"), rid),
         )
-        return jsonify(db.fetchone("SELECT * FROM rollen WHERE id = ?", (rid,)))
+        _replace_rolle_members(db, rid, body)
+        return jsonify(_enrich_rolle(db, db.fetchone("SELECT * FROM rollen WHERE id = ?", (rid,))))
     finally:
         db.disconnect()
 
@@ -524,6 +573,7 @@ def list_termine():
                     (row["bespr_nr"],),
                 )
             ]
+            _enrich_termin_resources(db, row)
         return jsonify(rows)
     finally:
         db.disconnect()
@@ -546,6 +596,22 @@ def _termin_with_intervall(db: DatabaseInterface, nr: int) -> dict | None:
                 (nr,),
             )
         ]
+        _enrich_termin_resources(db, row)
+    return row
+
+
+def _enrich_termin_resources(db: DatabaseInterface, row: dict) -> dict:
+    row["raum_ids"] = [
+        item["raum_id"]
+        for item in db.fetchall("SELECT raum_id FROM termin_raeume WHERE bespr_nr = ? ORDER BY raum_id", (row["bespr_nr"],))
+    ]
+    row["komponenten_ids"] = [
+        item["komponente_id"]
+        for item in db.fetchall(
+            "SELECT komponente_id FROM termin_komponenten WHERE bespr_nr = ? ORDER BY komponente_id",
+            (row["bespr_nr"],),
+        )
+    ]
     return row
 
 
@@ -569,6 +635,39 @@ def _replace_teilnehmer(db: DatabaseInterface, nr: int, teilnehmer: list[str]) -
         )
 
 
+def _validated_resource_ids(db: DatabaseInterface, body: dict) -> tuple[list[int], list[int], tuple | None]:
+    rooms = body.get("raum_ids", [])
+    components = body.get("komponenten_ids", [])
+    if not isinstance(rooms, list) or not isinstance(components, list):
+        return [], [], (jsonify({"error": "Räume und Komponenten müssen Listen sein"}), 400)
+    try:
+        room_ids = list(dict.fromkeys(int(value) for value in rooms))
+        component_ids = list(dict.fromkeys(int(value) for value in components))
+    except (TypeError, ValueError):
+        return [], [], (jsonify({"error": "Ungültige Ressourcen-ID"}), 400)
+    for room_id in room_ids:
+        if not db.fetchone("SELECT id FROM raeume WHERE id = ?", (room_id,)):
+            return [], [], (jsonify({"error": f"Unbekannter Raum: {room_id}"}), 400)
+    for component_id in component_ids:
+        if not db.fetchone("SELECT id FROM komponenten WHERE id = ?", (component_id,)):
+            return [], [], (jsonify({"error": f"Unbekannte Komponente: {component_id}"}), 400)
+    return room_ids, component_ids, None
+
+
+def _replace_termin_resources(
+    db: DatabaseInterface, nr: int, room_ids: list[int], component_ids: list[int]
+) -> None:
+    db.execute("DELETE FROM termin_raeume WHERE bespr_nr = ?", (nr,))
+    db.execute("DELETE FROM termin_komponenten WHERE bespr_nr = ?", (nr,))
+    for room_id in room_ids:
+        db.execute("INSERT INTO termin_raeume (bespr_nr, raum_id) VALUES (?, ?)", (nr, room_id))
+    for component_id in component_ids:
+        db.execute(
+            "INSERT INTO termin_komponenten (bespr_nr, komponente_id) VALUES (?, ?)",
+            (nr, component_id),
+        )
+
+
 @resources_bp.route("/termine", methods=["POST"])
 def create_termin():
     body = request.get_json(silent=True) or {}
@@ -583,6 +682,9 @@ def create_termin():
     db = _get_db()
     try:
         teilnehmer, validation_error = _validated_teilnehmer(db, body)
+        if validation_error:
+            return validation_error
+        room_ids, component_ids, validation_error = _validated_resource_ids(db, body)
         if validation_error:
             return validation_error
         bespr_nr = body.get("bespr_nr")
@@ -603,6 +705,7 @@ def create_termin():
             (bespr_nr, bezeichnung, intervall, dauer_min),
         )
         _replace_teilnehmer(db, bespr_nr, teilnehmer)
+        _replace_termin_resources(db, bespr_nr, room_ids, component_ids)
         return jsonify(_termin_with_intervall(db, bespr_nr)), 201
     finally:
         db.disconnect()
@@ -624,6 +727,9 @@ def update_termin(nr: int):
         teilnehmer, validation_error = _validated_teilnehmer(db, body)
         if validation_error:
             return validation_error
+        room_ids, component_ids, validation_error = _validated_resource_ids(db, body)
+        if validation_error:
+            return validation_error
         if not db.fetchone("SELECT bespr_nr FROM termine WHERE bespr_nr = ?", (nr,)):
             return jsonify({"error": "Termin nicht gefunden"}), 404
         if not db.fetchone("SELECT kuerzel FROM intervalle WHERE kuerzel = ?", (intervall,)):
@@ -633,6 +739,7 @@ def update_termin(nr: int):
             (bezeichnung, intervall, dauer_min, nr),
         )
         _replace_teilnehmer(db, nr, teilnehmer)
+        _replace_termin_resources(db, nr, room_ids, component_ids)
         return jsonify(_termin_with_intervall(db, nr))
     finally:
         db.disconnect()
@@ -645,6 +752,8 @@ def delete_termin(nr: int):
         if not db.fetchone("SELECT bespr_nr FROM termine WHERE bespr_nr = ?", (nr,)):
             return jsonify({"error": "Termin nicht gefunden"}), 404
         db.execute("DELETE FROM termin_teilnehmer WHERE bespr_nr = ?", (nr,))
+        db.execute("DELETE FROM termin_raeume WHERE bespr_nr = ?", (nr,))
+        db.execute("DELETE FROM termin_komponenten WHERE bespr_nr = ?", (nr,))
         try:
             db.execute("DELETE FROM termine WHERE bespr_nr = ?", (nr,))
         except integrity_errors():

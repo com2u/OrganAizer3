@@ -100,6 +100,10 @@ echo "Upload complete."
 echo "Building and starting the Docker container on the server..."
 $SSH "set -e
 cd $REMOTE_DIR
+# Generate Open Notebook secrets once. Existing values are never replaced.
+grep -q '^OPEN_NOTEBOOK_ENCRYPTION_KEY=' .env || echo \"OPEN_NOTEBOOK_ENCRYPTION_KEY=\$(openssl rand -hex 32)\" >> .env
+grep -q '^OPEN_NOTEBOOK_PASSWORD=' .env || echo \"OPEN_NOTEBOOK_PASSWORD=\$(openssl rand -hex 24)\" >> .env
+grep -q '^OPEN_NOTEBOOK_DB_PASSWORD=' .env || echo \"OPEN_NOTEBOOK_DB_PASSWORD=\$(openssl rand -hex 24)\" >> .env
 docker compose up -d --build
 echo 'Ensuring SIP trunk and dispatch rule exist...'
 docker compose exec -T voice-agent python -m app.setup_sip"

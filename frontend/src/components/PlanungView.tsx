@@ -96,7 +96,7 @@ function RegelnTab() {
       </div>
       {error && <div className="alert alert-error">{error}</div>}
       {editing && (
-        <div className="resource-form card resource-edit-modal" role="dialog" aria-modal="true">
+        <div className="resource-form card resource-edit-modal planning-rule-modal" role="dialog" aria-modal="true">
           <div className="form-grid">
             <label>{t('plan.regel.bezeichnung')}<input value={editing.bezeichnung || ''} onChange={e => setEditing({ ...editing, bezeichnung: e.target.value })} /></label>
             <label>{t('plan.regel.typ')}
@@ -104,7 +104,7 @@ function RegelnTab() {
                 {REGEL_TYPEN.map(rt => <option key={rt} value={rt}>{t(`plan.typ.${rt}`)}</option>)}
               </select>
             </label>
-            <label>{t('plan.regel.bedingung')}<textarea value={editing.bedingung || ''} onChange={e => setEditing({ ...editing, bedingung: e.target.value })} rows={3} /></label>
+            <label className="planning-rule-condition">{t('plan.regel.bedingung')}<textarea value={editing.bedingung || ''} onChange={e => setEditing({ ...editing, bedingung: e.target.value })} rows={12} /></label>
             <label>{t('plan.regel.prioritaet')}<input type="number" min={1} max={10} value={editing.prioritaet ?? 5} onChange={e => setEditing({ ...editing, prioritaet: parseInt(e.target.value) || 5 })} /></label>
           </div>
           <div className="form-actions">

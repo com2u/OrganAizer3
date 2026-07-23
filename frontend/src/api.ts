@@ -67,6 +67,44 @@ export function logout(): void {
   clearToken()
 }
 
+export interface ResearchNotebook {
+  id: string
+  name: string
+  description?: string
+  created?: string
+  updated?: string
+}
+
+export interface OpenNotebookStatus {
+  available: boolean
+  public_url: string
+  service?: Record<string, unknown>
+}
+
+export async function fetchOpenNotebookStatus(): Promise<OpenNotebookStatus> {
+  const res = await apiFetch('/open-notebook/status')
+  if (!res.ok) throw new Error('Open Notebook status could not be loaded')
+  return res.json()
+}
+
+export async function fetchResearchNotebooks(): Promise<ResearchNotebook[]> {
+  const res = await apiFetch('/open-notebook/notebooks')
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Research notebooks could not be loaded')
+  return Array.isArray(data) ? data : (data.notebooks || [])
+}
+
+export async function createResearchNotebook(name: string, description: string): Promise<ResearchNotebook> {
+  const res = await apiFetch('/open-notebook/notebooks', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, description }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Research notebook could not be created')
+  return data
+}
+
 export async function fetchConfig(): Promise<Record<string, unknown>> {
   const res = await apiFetch('/config')
   if (!res.ok) throw new Error('Failed to fetch configuration')
@@ -124,10 +162,27 @@ export async function fetchIntervalle(): Promise<Intervall[]> {
   return res.json()
 }
 
-export async function importExcel(file: File): Promise<void> {
+export interface ImportIssue {
+  severity: 'error' | 'warning'
+  sheet: string
+  row?: number
+  message: string
+}
+
+export async function validateExcelImport(file: File): Promise<{ valid: boolean; issues: ImportIssue[] }> {
+  const formData = new FormData()
+  formData.append('file', file)
+  const res = await apiFetch('/import/validate', { method: 'POST', body: formData })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Import validation failed')
+  return data
+}
+
+export async function importExcel(file: File, confirmInvalid = false): Promise<void> {
   const formData = new FormData()
   formData.append('file', file)
   formData.append('confirm_overwrite', 'true')
+  formData.append('confirm_invalid', confirmInvalid ? 'true' : 'false')
   const res = await apiFetch('/import', {
     method: 'POST',
     body: formData,
@@ -378,8 +433,8 @@ export const updateMitglied = (nummer: string, m: { bezeichnung: string; name?: 
 export const deleteMitglied = (nummer: string) => _resourceCrud<{ status: string }>('/mitglieder', `/${encodeURIComponent(nummer)}`, { method: 'DELETE' })
 
 export const fetchResourceTermine = () => _resourceCrud<TerminDef[]>('/termine', '')
-export const createTermin = (tr: { bezeichnung: string; intervall: string; dauer_min: number; bespr_nr?: number; teilnehmer?: string[] }) => _resourceCrud<TerminDef>('/termine', '', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(tr) })
-export const updateTermin = (nr: number, tr: { bezeichnung: string; intervall: string; dauer_min: number; teilnehmer?: string[] }) => _resourceCrud<TerminDef>('/termine', `/${nr}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(tr) })
+export const createTermin = (tr: { bezeichnung: string; intervall: string; dauer_min: number; bespr_nr?: number; teilnehmer?: string[]; raum_ids?: number[]; komponenten_ids?: number[] }) => _resourceCrud<TerminDef>('/termine', '', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(tr) })
+export const updateTermin = (nr: number, tr: { bezeichnung: string; intervall: string; dauer_min: number; teilnehmer?: string[]; raum_ids?: number[]; komponenten_ids?: number[] }) => _resourceCrud<TerminDef>('/termine', `/${nr}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(tr) })
 export const deleteTermin = (nr: number) => _resourceCrud<{ status: string }>('/termine', `/${nr}`, { method: 'DELETE' })
 
 // ===== Planning =====

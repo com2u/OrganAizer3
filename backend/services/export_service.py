@@ -25,6 +25,12 @@ def export_excel(db: DatabaseInterface, filepath: str) -> None:
     _export_terminliste(db, wb)
     _export_intervalle(db, wb)
     _export_planungsregeln(db, wb)
+    _export_personen(db, wb)
+    _export_rollen(db, wb)
+    _export_raeume(db, wb)
+    _export_komponenten(db, wb)
+    _export_rollenzuordnungen(db, wb)
+    _export_terminressourcen(db, wb)
 
     wb.save(filepath)
     logger.info("Export completed: %s", filepath)
@@ -246,3 +252,53 @@ def _export_planungsregeln(db: DatabaseInterface, wb: openpyxl.Workbook) -> None
     for index, width in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(index)].width = width
     logger.info("Exported %d planungsregeln", len(rows))
+
+
+def _export_personen(db: DatabaseInterface, wb: openpyxl.Workbook) -> None:
+    ws = wb.create_sheet("Personen")
+    ws.append(["ID", "Vorname", "Nachname", "E-Mail", "Telefon", "Standort", "Usergruppe", "Aktiv"])
+    for row in db.fetchall("SELECT id, vorname, nachname, email, telefon, standort, usergruppe, aktiv FROM personen ORDER BY id"):
+        ws.append([row["id"], row["vorname"], row["nachname"], row["email"], row["telefon"], row["standort"], row["usergruppe"], row["aktiv"]])
+
+
+def _export_rollen(db: DatabaseInterface, wb: openpyxl.Workbook) -> None:
+    ws = wb.create_sheet("Rollen")
+    ws.append(["ID", "Bezeichnung", "Beschreibung", "Farbe"])
+    for row in db.fetchall("SELECT id, bezeichnung, beschreibung, farbe FROM rollen ORDER BY id"):
+        ws.append([row["id"], row["bezeichnung"], row["beschreibung"], row["farbe"]])
+
+
+def _export_raeume(db: DatabaseInterface, wb: openpyxl.Workbook) -> None:
+    ws = wb.create_sheet("Raeume")
+    ws.append(["ID", "Bezeichnung", "Gebäude", "Kapazität", "Ausstattung", "Aktiv"])
+    for row in db.fetchall("SELECT id, bezeichnung, gebaeude, kapazitaet, ausstattung, aktiv FROM raeume ORDER BY id"):
+        ws.append([row["id"], row["bezeichnung"], row["gebaeude"], row["kapazitaet"], row["ausstattung"], row["aktiv"]])
+
+
+def _export_komponenten(db: DatabaseInterface, wb: openpyxl.Workbook) -> None:
+    ws = wb.create_sheet("Komponenten")
+    ws.append(["ID", "Bezeichnung", "Typ", "Beschreibung", "Verfügbar"])
+    for row in db.fetchall("SELECT id, bezeichnung, typ, beschreibung, verfuegbar FROM komponenten ORDER BY id"):
+        ws.append([row["id"], row["bezeichnung"], row["typ"], row["beschreibung"], row["verfuegbar"]])
+
+
+def _export_rollenzuordnungen(db: DatabaseInterface, wb: openpyxl.Workbook) -> None:
+    ws = wb.create_sheet("RollenPersonen")
+    ws.append(["Rolle-ID", "Person-ID"])
+    for row in db.fetchall("SELECT rolle_id, person_id FROM person_rollen ORDER BY rolle_id, person_id"):
+        ws.append([row["rolle_id"], row["person_id"]])
+    ws = wb.create_sheet("RollenGruppen")
+    ws.append(["Rolle-ID", "Usergruppe"])
+    for row in db.fetchall("SELECT rolle_id, usergruppe FROM rolle_gruppen ORDER BY rolle_id, usergruppe"):
+        ws.append([row["rolle_id"], row["usergruppe"]])
+
+
+def _export_terminressourcen(db: DatabaseInterface, wb: openpyxl.Workbook) -> None:
+    ws = wb.create_sheet("TerminRaeume")
+    ws.append(["Bespr.Nr.", "Raum-ID"])
+    for row in db.fetchall("SELECT bespr_nr, raum_id FROM termin_raeume ORDER BY bespr_nr, raum_id"):
+        ws.append([row["bespr_nr"], row["raum_id"]])
+    ws = wb.create_sheet("TerminKomponenten")
+    ws.append(["Bespr.Nr.", "Komponente-ID"])
+    for row in db.fetchall("SELECT bespr_nr, komponente_id FROM termin_komponenten ORDER BY bespr_nr, komponente_id"):
+        ws.append([row["bespr_nr"], row["komponente_id"]])

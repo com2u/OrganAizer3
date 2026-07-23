@@ -1,5 +1,17 @@
 # Terminlandschaft - Requirements
 
+## Open Notebook integration (0.1.15)
+
+- Knowledge offers a dedicated, responsive “Research notebooks” tab in German
+  and English without replacing the existing Obsidian workflow.
+- The interface shows readiness and supports notebook listing and creation,
+  including loading, empty, offline, and error states.
+- Credentials and internal service addresses stay on the backend; native UI
+  access uses authenticated OrganAIzer endpoints.
+- Open Notebook and SurrealDB data persist below `data/` so backend uploads
+  cannot overwrite research content.
+- The full studio is linked only through an explicitly configured HTTPS URL.
+
 ## Core Requirements
 
 1. Create a database for managing appointments for scheduling purposes using Python via the CLI.
@@ -39,6 +51,11 @@ Describe the current architecture in a implementation.md
 2. Double-clicking a list or table entry opens its editor; explicit edit buttons remain available for accessibility.
 3. Meeting editors load persisted user groups and allow participants to be added or removed using drag-and-drop or click controls.
 4. Participant updates are validated and persisted in `termin_teilnehmer`.
+5. People include a searchable location field.
+6. Roles support validated assignments to people and user groups.
+7. Meetings support validated assignments to rooms and components.
+8. Excel import/export preserves all resource entities and assignments in dedicated worksheets.
+9. Before replacement, imports list missing or inconsistent references and require explicit confirmation or cancellation.
 
 ## AI Planning
 

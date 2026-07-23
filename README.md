@@ -8,7 +8,26 @@
 
 ---
 
-## Version: 0.1.13 (July 2026)
+## Version: 0.1.15 (July 2026)
+
+### Research notebooks (Open Notebook)
+
+The **Knowledge → Research notebooks** workspace integrates the self-hosted
+[Open Notebook](https://github.com/lfnovo/open-notebook) service for
+source-grounded research. OrganAIzer provides the secure entry point and
+notebook overview; PDFs, websites, video/audio sources, contextual chat,
+transformations, citations, and podcast creation are handled by Open Notebook.
+
+The deployment adds two isolated containers (`open-notebook` and
+`open-notebook-db`). Persistent files live below `data/open-notebook/` and are
+preserved by `upload_backend.sh`. The browser never receives the internal API
+address or password; native requests pass through the authenticated
+`/api/open-notebook/*` bridge.
+
+Production should define `OPEN_NOTEBOOK_ENCRYPTION_KEY`,
+`OPEN_NOTEBOOK_PASSWORD`, and `OPEN_NOTEBOOK_DB_PASSWORD` in `.env`.
+`OPEN_NOTEBOOK_PUBLIC_URL` is optional and enables the full studio link when
+the UI is published behind an HTTPS reverse proxy.
 
 ## Feature Overview
 
@@ -19,6 +38,8 @@
 ### Termine (Calendar)
 - Excel import/export, weekly calendar, appointment details, filtering, highlighting.
 - Resource editors open consistently as modal dialogs on double-click; meeting participants can be assigned from existing user groups by drag-and-drop.
+- Meetings can additionally reference rooms and components; roles can contain people and user groups through the same drag-and-drop interface.
+- Excel import/export includes people (with location), roles, rooms, components, and all assignment tables. Imports are validated before destructive replacement.
 
 ### Aufgaben (Tasks) — v0.1.3
 - **YouTube Download**: URL input, format selection (MP3/MP4), yt-dlp with Deno JS runtime.

@@ -1,0 +1,44 @@
+import { test, expect } from '@playwright/test'
+
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('organaizer_token', 'test-token'))
+  await page.route('**/api/auth/me', route => route.fulfill({
+    json: { id: 'test', email: 'test@example.org', name: 'Test User', role: 'admin' },
+  }))
+  await page.route('**/api/obsidian/**', route => route.fulfill({ json: { tree: { type: 'directory', name: '', path: '', children: [] }, tags: [], notes: [] } }))
+})
+
+test('Recherche-Notebooks integriert Status, Übersicht und Anlage', async ({ page }) => {
+  let notebooks = [{ id: 'notebook:1', name: 'Marktanalyse', description: 'Quellen für die Strategie' }]
+  await page.route('**/api/open-notebook/status', route => route.fulfill({ json: { available: true, public_url: '' } }))
+  await page.route('**/api/open-notebook/notebooks', async route => {
+    if (route.request().method() === 'POST') {
+      const body = route.request().postDataJSON()
+      notebooks = [...notebooks, { id: 'notebook:2', name: body.name, description: body.description }]
+      return route.fulfill({ status: 201, json: notebooks[1] })
+    }
+    return route.fulfill({ json: notebooks })
+  })
+
+  await page.goto('/')
+  await page.locator('nav button[title^="Wissen"]').click()
+  await page.getByRole('button', { name: 'Recherche-Notebooks' }).click()
+  await expect(page.getByText('Quellenbasierte KI-Recherche')).toBeVisible()
+  await expect(page.getByText('Marktanalyse')).toBeVisible()
+  await expect(page.getByText('Bereit', { exact: true })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Neues Notebook' }).click()
+  await page.getByLabel('Name').fill('Projekt Phoenix')
+  await page.getByLabel('Ziel und Kontext').fill('Entscheidungsgrundlage erstellen')
+  await page.getByRole('button', { name: 'Notebook anlegen' }).click()
+  await expect(page.getByText('Projekt Phoenix')).toBeVisible()
+})
+
+test('Recherche-Notebooks zeigt einen hilfreichen Offlinezustand', async ({ page }) => {
+  await page.route('**/api/open-notebook/status', route => route.fulfill({ json: { available: false, public_url: '' } }))
+  await page.goto('/')
+  await page.locator('nav button[title^="Wissen"]').click()
+  await page.getByRole('button', { name: 'Recherche-Notebooks' }).click()
+  await expect(page.getByText('Recherche-Dienst wird noch gestartet')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Neues Notebook' })).toBeDisabled()
+})
