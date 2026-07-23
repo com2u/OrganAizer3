@@ -132,6 +132,7 @@ export interface CallDetail extends Call {
 export interface PhonebookContact {
   number: string
   name: string
+  email: string
   notes: string[]
 }
 
@@ -235,6 +236,7 @@ export interface TerminDef {
   intervall: string
   dauer_min: number
   intervall_text: string
+  teilnehmer?: string[]
 }
 
 // ===== Planning =====

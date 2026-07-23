@@ -215,6 +215,11 @@ export async function endCall(callId: number): Promise<Call> {
   return res.json()
 }
 
+export async function deleteCall(callId: number): Promise<void> {
+  const res = await apiFetch(`/telephony/calls/${callId}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error('Failed to delete call')
+}
+
 export async function sendVoiceMessage(message: string, callId?: number): Promise<VoiceResponse> {
   const res = await apiFetch('/telephony/voice', {
     method: 'POST',
@@ -235,7 +240,7 @@ export async function fetchPhonebook(): Promise<PhonebookContact[]> {
 }
 
 export async function savePhonebookContact(
-  contact: { number: string; name: string; notes: string[]; original_number?: string }
+  contact: { number: string; name: string; email: string; notes: string[]; original_number?: string }
 ): Promise<PhonebookContact> {
   const res = await apiFetch('/telephony/phonebook', {
     method: 'POST',
@@ -373,8 +378,8 @@ export const updateMitglied = (nummer: string, m: { bezeichnung: string; name?: 
 export const deleteMitglied = (nummer: string) => _resourceCrud<{ status: string }>('/mitglieder', `/${encodeURIComponent(nummer)}`, { method: 'DELETE' })
 
 export const fetchResourceTermine = () => _resourceCrud<TerminDef[]>('/termine', '')
-export const createTermin = (tr: { bezeichnung: string; intervall: string; dauer_min: number; bespr_nr?: number }) => _resourceCrud<TerminDef>('/termine', '', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(tr) })
-export const updateTermin = (nr: number, tr: { bezeichnung: string; intervall: string; dauer_min: number }) => _resourceCrud<TerminDef>('/termine', `/${nr}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(tr) })
+export const createTermin = (tr: { bezeichnung: string; intervall: string; dauer_min: number; bespr_nr?: number; teilnehmer?: string[] }) => _resourceCrud<TerminDef>('/termine', '', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(tr) })
+export const updateTermin = (nr: number, tr: { bezeichnung: string; intervall: string; dauer_min: number; teilnehmer?: string[] }) => _resourceCrud<TerminDef>('/termine', `/${nr}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(tr) })
 export const deleteTermin = (nr: number) => _resourceCrud<{ status: string }>('/termine', `/${nr}`, { method: 'DELETE' })
 
 // ===== Planning =====

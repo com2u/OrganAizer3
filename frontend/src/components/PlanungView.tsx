@@ -96,7 +96,7 @@ function RegelnTab() {
       </div>
       {error && <div className="alert alert-error">{error}</div>}
       {editing && (
-        <div className="resource-form card">
+        <div className="resource-form card resource-edit-modal" role="dialog" aria-modal="true">
           <div className="form-grid">
             <label>{t('plan.regel.bezeichnung')}<input value={editing.bezeichnung || ''} onChange={e => setEditing({ ...editing, bezeichnung: e.target.value })} /></label>
             <label>{t('plan.regel.typ')}
@@ -119,7 +119,7 @@ function RegelnTab() {
             <thead><tr><th>Nr.</th><th>{t('plan.regel.bezeichnung')}</th><th>{t('plan.regel.typ')}</th><th>{t('plan.regel.bedingung')}</th><th>Prio</th><th>{t('plan.regel.aktiv')}</th><th></th></tr></thead>
             <tbody>
               {items.map(r => (
-                <tr key={r.id}>
+                <tr key={r.id} onDoubleClick={() => setEditing(r)} title={t('res.doubleClickEdit')}>
                   <td className="text-secondary">{r.id}</td>
                   <td>{r.bezeichnung}</td>
                   <td><span className={`badge badge-${r.typ}`}>{t(`plan.typ.${r.typ}`)}</span></td>

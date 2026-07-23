@@ -47,6 +47,9 @@ def _caller_block(contact: Optional[Contact]) -> str:
     return (
         "# Anrufer\n"
         f"- Der Anrufer ist bekannt: {contact.get('name')}.\n"
+        f"- Hinterlegte E-Mail-Adresse: {contact.get('email') or '(keine)'}.\n"
+        "- Verwende diese E-Mail-Adresse als Empfänger, wenn der Anrufer dich "
+        "ausdrücklich bittet, ihm eine Nachricht oder Information per E-Mail zu senden.\n"
         "- Bekannte Notizen zu dieser Person:\n"
         f"{format_notes(contact)}\n"
         "- Nutze diese Notizen natürlich im Gespräch (z. B. passende Nachfragen), "

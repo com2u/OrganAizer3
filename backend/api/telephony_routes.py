@@ -92,6 +92,13 @@ def get_call(call_id: int):
     return jsonify(call)
 
 
+@telephony_bp.delete("/calls/<int:call_id>")
+def delete_call(call_id: int):
+    if not call_log.delete_call(call_id):
+        return jsonify({"error": "Telefonat nicht gefunden"}), 404
+    return jsonify({"status": "ok"})
+
+
 @telephony_bp.post("/calls")
 def start_call():
     payload = request.get_json(silent=True) or {}

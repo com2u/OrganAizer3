@@ -516,13 +516,21 @@ def list_termine():
                LEFT JOIN intervalle i ON t.intervall = i.kuerzel
                ORDER BY t.bespr_nr"""
         )
+        for row in rows:
+            row["teilnehmer"] = [
+                item["usergruppe"]
+                for item in db.fetchall(
+                    "SELECT usergruppe FROM termin_teilnehmer WHERE bespr_nr = ? ORDER BY usergruppe",
+                    (row["bespr_nr"],),
+                )
+            ]
         return jsonify(rows)
     finally:
         db.disconnect()
 
 
 def _termin_with_intervall(db: DatabaseInterface, nr: int) -> dict | None:
-    return db.fetchone(
+    row = db.fetchone(
         """SELECT t.bespr_nr, t.bezeichnung, t.intervall, t.dauer_min,
                   i.bedeutung as intervall_text
            FROM termine t
@@ -530,6 +538,35 @@ def _termin_with_intervall(db: DatabaseInterface, nr: int) -> dict | None:
            WHERE t.bespr_nr = ?""",
         (nr,),
     )
+    if row:
+        row["teilnehmer"] = [
+            item["usergruppe"]
+            for item in db.fetchall(
+                "SELECT usergruppe FROM termin_teilnehmer WHERE bespr_nr = ? ORDER BY usergruppe",
+                (nr,),
+            )
+        ]
+    return row
+
+
+def _validated_teilnehmer(db: DatabaseInterface, body: dict) -> tuple[list[str], tuple | None]:
+    raw = body.get("teilnehmer", [])
+    if not isinstance(raw, list):
+        return [], (jsonify({"error": "Teilnehmer muss eine Liste sein"}), 400)
+    values = list(dict.fromkeys(str(value).strip() for value in raw if str(value).strip()))
+    for value in values:
+        if not db.fetchone("SELECT nummer FROM usergruppen WHERE nummer = ?", (value,)):
+            return [], (jsonify({"error": f"Unbekannte Benutzergruppe: {value}"}), 400)
+    return values, None
+
+
+def _replace_teilnehmer(db: DatabaseInterface, nr: int, teilnehmer: list[str]) -> None:
+    db.execute("DELETE FROM termin_teilnehmer WHERE bespr_nr = ?", (nr,))
+    for usergruppe in teilnehmer:
+        db.execute(
+            "INSERT INTO termin_teilnehmer (bespr_nr, usergruppe) VALUES (?, ?)",
+            (nr, usergruppe),
+        )
 
 
 @resources_bp.route("/termine", methods=["POST"])
@@ -545,6 +582,9 @@ def create_termin():
         return jsonify({"error": "Dauer (Minuten) muss eine Zahl sein"}), 400
     db = _get_db()
     try:
+        teilnehmer, validation_error = _validated_teilnehmer(db, body)
+        if validation_error:
+            return validation_error
         bespr_nr = body.get("bespr_nr")
         if bespr_nr in (None, ""):
             row = db.fetchone("SELECT MAX(bespr_nr) AS m FROM termine")
@@ -562,6 +602,7 @@ def create_termin():
             "INSERT INTO termine (bespr_nr, bezeichnung, intervall, dauer_min) VALUES (?, ?, ?, ?)",
             (bespr_nr, bezeichnung, intervall, dauer_min),
         )
+        _replace_teilnehmer(db, bespr_nr, teilnehmer)
         return jsonify(_termin_with_intervall(db, bespr_nr)), 201
     finally:
         db.disconnect()
@@ -580,6 +621,9 @@ def update_termin(nr: int):
         return jsonify({"error": "Dauer (Minuten) muss eine Zahl sein"}), 400
     db = _get_db()
     try:
+        teilnehmer, validation_error = _validated_teilnehmer(db, body)
+        if validation_error:
+            return validation_error
         if not db.fetchone("SELECT bespr_nr FROM termine WHERE bespr_nr = ?", (nr,)):
             return jsonify({"error": "Termin nicht gefunden"}), 404
         if not db.fetchone("SELECT kuerzel FROM intervalle WHERE kuerzel = ?", (intervall,)):
@@ -588,6 +632,7 @@ def update_termin(nr: int):
             "UPDATE termine SET bezeichnung = ?, intervall = ?, dauer_min = ? WHERE bespr_nr = ?",
             (bezeichnung, intervall, dauer_min, nr),
         )
+        _replace_teilnehmer(db, nr, teilnehmer)
         return jsonify(_termin_with_intervall(db, nr))
     finally:
         db.disconnect()

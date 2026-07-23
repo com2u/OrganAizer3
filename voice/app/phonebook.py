@@ -27,6 +27,7 @@ logger = get_logger("phonebook")
 class Contact(TypedDict):
     number: str
     name: str
+    email: str
     notes: list[str]
 
 
@@ -148,7 +149,7 @@ class Phonebook:
                 None,
             )
             if contact is None:
-                contact = {"number": target, "name": "", "notes": []}
+                contact = {"number": target, "name": "", "email": "", "notes": []}
                 self._contacts.append(contact)
                 logger.info("Created phonebook entry for caller %s.", target)
             contact.setdefault("notes", []).append(note)

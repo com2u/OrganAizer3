@@ -8,7 +8,7 @@
 
 ---
 
-## Version: 0.1.12 (July 2026)
+## Version: 0.1.13 (July 2026)
 
 ## Feature Overview
 
@@ -18,6 +18,7 @@
 
 ### Termine (Calendar)
 - Excel import/export, weekly calendar, appointment details, filtering, highlighting.
+- Resource editors open consistently as modal dialogs on double-click; meeting participants can be assigned from existing user groups by drag-and-drop.
 
 ### Aufgaben (Tasks) — v0.1.3
 - **YouTube Download**: URL input, format selection (MP3/MP4), yt-dlp with Deno JS runtime.
@@ -40,6 +41,7 @@
 ### Telefonie
 - Incoming and outgoing SIP calls use the same LiveKit agent while remaining independent of the browser Dialog transport.
 - Phonebook, call notes, transcript summaries, and telephony configuration are persisted below the protected `data/` directory.
+- Individual calls can be deleted. Phonebook contacts include an email address that is available to the voice assistant for explicitly requested messages.
 
 ### KI Verbindungen (AI Connections)
 - 8 Providers: Ollama, llama.cpp, Amazon Bedrock, Copilot, OpenAI, Claude, Gemini, OpenRouter.

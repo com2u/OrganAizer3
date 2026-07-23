@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import {
   fetchTelephonyConfig, saveTelephonyConfig, fetchTelephonyStatus,
-  fetchCalls, fetchCallDetail, startCall, endCall, sendVoiceMessage,
+  fetchCalls, fetchCallDetail, startCall, endCall, deleteCall, sendVoiceMessage,
   fetchPhonebook, savePhonebookContact, deletePhonebookContact
 } from '../api'
 import type { TelephonyConfig, TelephonyStatus, Call, CallDetail, DialogEntry, PhonebookContact } from '../types'
@@ -409,6 +409,17 @@ function CallHistory({ t }: { t: (k: string) => string }) {
     }
   }
 
+  const handleDeleteCall = async (callId: number) => {
+    if (!window.confirm(t('telefonie.confirmDeleteCall'))) return
+    try {
+      await deleteCall(callId)
+      if (selected?.id === callId) setSelected(null)
+      await loadCalls()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
+
   return (
     <div className="telefonie-history">
       {error && <div className="telefonie-alert error"><AlertTriangle size={16} /> {error}</div>}
@@ -452,6 +463,11 @@ function CallHistory({ t }: { t: (k: string) => string }) {
                   <PhoneOff size={14} />
                 </button>
               )}
+              <button className="btn-ghost call-delete-btn"
+                onClick={(e) => { e.stopPropagation(); handleDeleteCall(call.id) }}
+                title={t('telefonie.deleteCall')}>
+                <Trash2 size={14} />
+              </button>
             </div>
           ))}
         </div>
@@ -505,12 +521,12 @@ function CallHistory({ t }: { t: (k: string) => string }) {
 
 // ===== Phonebook editor (Telefonate tab) =====
 function PhonebookPanel({ t }: { t: (k: string) => string }) {
-  const empty = { number: '', name: '', notes: '' }
+  const empty = { number: '', name: '', email: '', notes: '' }
   const [contacts, setContacts] = useState<PhonebookContact[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editing, setEditing] = useState<string | null>(null) // original number, '' = new
-  const [draft, setDraft] = useState<{ number: string; name: string; notes: string }>(empty)
+  const [draft, setDraft] = useState<{ number: string; name: string; email: string; notes: string }>(empty)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => { load() }, [])
@@ -529,7 +545,7 @@ function PhonebookPanel({ t }: { t: (k: string) => string }) {
   const startNew = () => { setEditing(''); setDraft(empty) }
   const startEdit = (c: PhonebookContact) => {
     setEditing(c.number)
-    setDraft({ number: c.number, name: c.name, notes: (c.notes || []).join('\n') })
+    setDraft({ number: c.number, name: c.name, email: c.email || '', notes: (c.notes || []).join('\n') })
   }
   const cancel = () => { setEditing(null); setDraft(empty) }
 
@@ -540,6 +556,7 @@ function PhonebookPanel({ t }: { t: (k: string) => string }) {
       await savePhonebookContact({
         number: draft.number.trim(),
         name: draft.name.trim(),
+        email: draft.email.trim(),
         notes: draft.notes.split('\n').map((n) => n.trim()).filter(Boolean),
         original_number: editing || undefined,
       })
@@ -574,7 +591,12 @@ function PhonebookPanel({ t }: { t: (k: string) => string }) {
       {error && <div className="telefonie-alert error"><AlertTriangle size={16} /> {error}</div>}
 
       {editing !== null && (
-        <div className="phonebook-edit">
+        <div className="modal-overlay phonebook-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="phonebook-dialog-title">
+          <div className="phonebook-edit resource-edit-modal">
+          <div className="modal-title-row">
+            <h2 id="phonebook-dialog-title">{editing ? t('telefonie.pb.edit') : t('telefonie.pb.add')}</h2>
+            <button className="btn-icon" onClick={cancel} aria-label={t('telefonie.pb.cancel')}><X size={18} /></button>
+          </div>
           <div className="phonebook-edit-row">
             <input className="form-field" value={draft.number}
               onChange={(e) => setDraft({ ...draft, number: e.target.value })}
@@ -582,6 +604,9 @@ function PhonebookPanel({ t }: { t: (k: string) => string }) {
             <input className="form-field" value={draft.name}
               onChange={(e) => setDraft({ ...draft, name: e.target.value })}
               placeholder={t('telefonie.pb.name')} />
+            <input className="form-field" type="email" value={draft.email}
+              onChange={(e) => setDraft({ ...draft, email: e.target.value })}
+              placeholder={t('telefonie.pb.email')} />
           </div>
           <textarea className="form-field phonebook-notes" value={draft.notes}
             onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
@@ -592,6 +617,7 @@ function PhonebookPanel({ t }: { t: (k: string) => string }) {
             </button>
             <button className="btn-ghost" onClick={cancel}><X size={14} /> {t('telefonie.pb.cancel')}</button>
           </div>
+          </div>
         </div>
       )}
 
@@ -601,10 +627,11 @@ function PhonebookPanel({ t }: { t: (k: string) => string }) {
       )}
       <div className="phonebook-list">
         {contacts.map((c) => (
-          <div key={c.number} className="phonebook-item">
+          <div key={c.number} className="phonebook-item" onDoubleClick={() => startEdit(c)} title={t('res.doubleClickEdit')}>
             <div className="phonebook-item-main">
               <span className="phonebook-name">{c.name || t('telefonie.unknown')}</span>
               <span className="phonebook-number">{c.number}</span>
+              {c.email && <a className="phonebook-email" href={`mailto:${c.email}`} onClick={e => e.stopPropagation()}>{c.email}</a>}
             </div>
             {c.notes && c.notes.length > 0 && (
               <ul className="phonebook-item-notes">

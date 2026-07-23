@@ -158,10 +158,10 @@ OrganAizer3/
 │   │   │   ├── WeekSelector.tsx     # Selects the displayed calendar week.
 │   │   │   ├── FilterPanel.tsx      # Filters visible schedule entries.
 │   │   │   ├── AppointmentDetail.tsx # Displays details for a selected appointment.
-│   │   │   ├── RessourcenView.tsx   # Manages people, roles, rooms, components, groups, and meeting resources.
+│   │   │   ├── RessourcenView.tsx   # Manages resources in modal editors and assigns meeting participants by drag-and-drop.
 │   │   │   ├── PlanungView.tsx      # Manages rules and asynchronous AI planning jobs with progress polling.
 │   │   │   ├── SystemView.tsx       # Monitors backend CPU, RAM, and Docker container states.
-│   │   │   ├── TelefonieView.tsx    # Manages SIP settings, phonebook, calls, and the web telephone assistant.
+│   │   │   ├── TelefonieView.tsx    # Manages SIP settings, deletable calls, email-aware phonebook contacts, and the web telephone assistant.
 │   │   │   ├── DialogView.tsx       # Provides the browser voice-dialog experience.
 │   │   │   ├── SpracheView.tsx      # Provides text-to-speech, speech-to-text, and dictation tools.
 │   │   │   ├── WissenView.tsx       # Provides Obsidian-backed knowledge management.

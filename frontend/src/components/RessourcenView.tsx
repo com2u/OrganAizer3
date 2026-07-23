@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useTheme } from '../ThemeContext'
 import {
   Users, MapPin, Puzzle, Tag, Calendar, Plus, Pencil, Trash2,
-  Search, X, Loader2, AlertTriangle
+  Search, X, Loader2, AlertTriangle, GripVertical
 } from 'lucide-react'
 import {
   fetchPersonen, createPerson, updatePerson, deletePerson,
@@ -131,7 +131,7 @@ function PersonenTab() {
       {error && <div className="alert alert-error">{error}</div>}
 
       {editing && (
-        <div className="resource-form card">
+        <div className="resource-form card resource-edit-modal" role="dialog" aria-modal="true">
           <div className="form-grid">
             <label>{t('res.vorname')}<input value={editing.vorname || ''} onChange={e => setEditing({ ...editing, vorname: e.target.value })} /></label>
             <label>{t('res.nachname')}<input value={editing.nachname || ''} onChange={e => setEditing({ ...editing, nachname: e.target.value })} /></label>
@@ -159,7 +159,7 @@ function PersonenTab() {
             </thead>
             <tbody>
               {items.map(p => (
-                <tr key={p.id}>
+                <tr key={p.id} onDoubleClick={() => setEditing(p)} title={t('res.doubleClickEdit')}>
                   <td>{p.vorname}</td>
                   <td>{p.nachname}</td>
                   <td>{p.email}</td>
@@ -246,7 +246,7 @@ function GruppenTab() {
       </div>
       {error && <div className="alert alert-error">{error}</div>}
       {editingGruppe && (
-        <div className="resource-form card">
+        <div className="resource-form card resource-edit-modal" role="dialog" aria-modal="true">
           <div className="form-grid">
             <label>{t('res.gruppe')}<input value={editingGruppe.gruppe} disabled={!editingGruppe.isNew} onChange={e => setEditingGruppe({ ...editingGruppe, gruppe: e.target.value })} /></label>
             <label>{t('res.bereich')}<input value={editingGruppe.bereich} onChange={e => setEditingGruppe({ ...editingGruppe, bereich: e.target.value })} /></label>
@@ -258,7 +258,7 @@ function GruppenTab() {
         </div>
       )}
       {editingMitglied && (
-        <div className="resource-form card">
+        <div className="resource-form card resource-edit-modal" role="dialog" aria-modal="true">
           <div className="form-grid">
             <label>{t('res.nummer')}<input value={editingMitglied.nummer} disabled={!editingMitglied.isNew} onChange={e => setEditingMitglied({ ...editingMitglied, nummer: e.target.value })} /></label>
             <label>{t('res.bezeichnung')}<input value={editingMitglied.bezeichnung} onChange={e => setEditingMitglied({ ...editingMitglied, bezeichnung: e.target.value })} /></label>
@@ -271,7 +271,7 @@ function GruppenTab() {
         </div>
       )}
       {items.length === 0 ? <EmptyState text={t('res.empty')} /> : items.map(g => (
-        <div key={g.gruppe} className="card" style={{ marginBottom: '1rem' }}>
+        <div key={g.gruppe} className="card" style={{ marginBottom: '1rem' }} onDoubleClick={() => setEditingGruppe({ gruppe: g.gruppe, bereich: g.bereich, isNew: false })} title={t('res.doubleClickEdit')}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <h3>{g.bereich} ({g.gruppe})</h3>
             <div className="actions">
@@ -289,7 +289,7 @@ function GruppenTab() {
             <table className="resource-table compact">
               <tbody>
                 {g.mitglieder.map((m: GruppenMitglied) => (
-                  <tr key={m.nummer}>
+                  <tr key={m.nummer} onDoubleClick={(event) => { event.stopPropagation(); setEditingMitglied({ gruppe: g.gruppe, nummer: m.nummer, bezeichnung: m.bezeichnung, name: m.name || '', isNew: false }) }} title={t('res.doubleClickEdit')}>
                     <td>{m.nummer}</td>
                     <td>{m.bezeichnung}</td>
                     <td>{m.name || '-'}</td>
@@ -355,7 +355,7 @@ function RollenTab() {
       </div>
       {error && <div className="alert alert-error">{error}</div>}
       {editing && (
-        <div className="resource-form card">
+        <div className="resource-form card resource-edit-modal" role="dialog" aria-modal="true">
           <div className="form-grid">
             <label>{t('res.bezeichnung')}<input value={editing.bezeichnung || ''} onChange={e => setEditing({ ...editing, bezeichnung: e.target.value })} /></label>
             <label>{t('res.beschreibung')}<textarea value={editing.beschreibung || ''} onChange={e => setEditing({ ...editing, beschreibung: e.target.value })} /></label>
@@ -373,7 +373,7 @@ function RollenTab() {
             <thead><tr><th>{t('res.bezeichnung')}</th><th>{t('res.beschreibung')}</th><th>{t('res.farbe')}</th><th></th></tr></thead>
             <tbody>
               {items.map(r => (
-                <tr key={r.id}>
+                <tr key={r.id} onDoubleClick={() => setEditing(r)} title={t('res.doubleClickEdit')}>
                   <td><span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}><span style={{ width: 12, height: 12, borderRadius: '50%', background: r.farbe, display: 'inline-block' }} />{r.bezeichnung}</span></td>
                   <td>{r.beschreibung || '-'}</td>
                   <td>{r.farbe}</td>
@@ -439,7 +439,7 @@ function RaeumeTab() {
       </div>
       {error && <div className="alert alert-error">{error}</div>}
       {editing && (
-        <div className="resource-form card">
+        <div className="resource-form card resource-edit-modal" role="dialog" aria-modal="true">
           <div className="form-grid">
             <label>{t('res.bezeichnung')}<input value={editing.bezeichnung || ''} onChange={e => setEditing({ ...editing, bezeichnung: e.target.value })} /></label>
             <label>{t('res.gebaeude')}<input value={editing.gebaeude || ''} onChange={e => setEditing({ ...editing, gebaeude: e.target.value })} /></label>
@@ -458,7 +458,7 @@ function RaeumeTab() {
             <thead><tr><th>{t('res.bezeichnung')}</th><th>{t('res.gebaeude')}</th><th>{t('res.kapazitaet')}</th><th>{t('res.ausstattung')}</th><th></th></tr></thead>
             <tbody>
               {items.map(r => (
-                <tr key={r.id}>
+                <tr key={r.id} onDoubleClick={() => setEditing(r)} title={t('res.doubleClickEdit')}>
                   <td>{r.bezeichnung}</td>
                   <td>{r.gebaeude || '-'}</td>
                   <td>{r.kapazitaet}</td>
@@ -525,7 +525,7 @@ function KomponentenTab() {
       </div>
       {error && <div className="alert alert-error">{error}</div>}
       {editing && (
-        <div className="resource-form card">
+        <div className="resource-form card resource-edit-modal" role="dialog" aria-modal="true">
           <div className="form-grid">
             <label>{t('res.bezeichnung')}<input value={editing.bezeichnung || ''} onChange={e => setEditing({ ...editing, bezeichnung: e.target.value })} /></label>
             <label>{t('res.typ')}<input value={editing.typ || ''} onChange={e => setEditing({ ...editing, typ: e.target.value })} /></label>
@@ -543,7 +543,7 @@ function KomponentenTab() {
             <thead><tr><th>{t('res.bezeichnung')}</th><th>{t('res.typ')}</th><th>{t('res.beschreibung')}</th><th>{t('res.verfuegbar')}</th><th></th></tr></thead>
             <tbody>
               {items.map(k => (
-                <tr key={k.id}>
+                <tr key={k.id} onDoubleClick={() => setEditing(k)} title={t('res.doubleClickEdit')}>
                   <td>{k.bezeichnung}</td>
                   <td>{k.typ || '-'}</td>
                   <td>{k.beschreibung || '-'}</td>
@@ -568,6 +568,7 @@ function TermineTab() {
   const { t } = useTheme()
   const [items, setItems] = useState<TerminDef[]>([])
   const [intervalle, setIntervalle] = useState<Intervall[]>([])
+  const [gruppen, setGruppen] = useState<Gruppe[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editing, setEditing] = useState<Partial<TerminDef> & { isNew?: boolean } | null>(null)
@@ -576,8 +577,8 @@ function TermineTab() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [rows, iv] = await Promise.all([fetchResourceTermine(), fetchIntervalle()])
-      setItems(rows); setIntervalle(iv); setError('')
+      const [rows, iv, groupRows] = await Promise.all([fetchResourceTermine(), fetchIntervalle(), fetchGruppen()])
+      setItems(rows); setIntervalle(iv); setGruppen(groupRows); setError('')
     } catch (e: any) { setError(e.message) }
     finally { setLoading(false) }
   }, [])
@@ -590,6 +591,7 @@ function TermineTab() {
       bezeichnung: editing.bezeichnung || '',
       intervall: editing.intervall || '',
       dauer_min: Number(editing.dauer_min) || 0,
+      teilnehmer: editing.teilnehmer || [],
     }
     try {
       if (editing.isNew) await createTermin(payload)
@@ -603,6 +605,21 @@ function TermineTab() {
     catch (e: any) { setError(e.message) }
   }
 
+  const addParticipant = (nummer: string) => {
+    if (!editing) return
+    const selected = editing.teilnehmer || []
+    if (!selected.includes(nummer)) setEditing({ ...editing, teilnehmer: [...selected, nummer] })
+  }
+
+  const removeParticipant = (nummer: string) => {
+    if (!editing) return
+    setEditing({ ...editing, teilnehmer: (editing.teilnehmer || []).filter(value => value !== nummer) })
+  }
+
+  const allMembers = gruppen.flatMap(group =>
+    group.mitglieder.map(member => ({ ...member, gruppe: group.gruppe, bereich: group.bereich }))
+  )
+
   return (
     <div className="resource-panel">
       <div className="resource-toolbar">
@@ -613,7 +630,7 @@ function TermineTab() {
       </div>
       {error && <div className="alert alert-error">{error}</div>}
       {editing && (
-        <div className="resource-form card">
+        <div className="resource-form card resource-edit-modal termin-edit-modal" role="dialog" aria-modal="true">
           <div className="form-grid">
             <label>{t('res.bezeichnung')}<input value={editing.bezeichnung || ''} onChange={e => setEditing({ ...editing, bezeichnung: e.target.value })} /></label>
             <label>{t('res.intervall')}
@@ -622,6 +639,48 @@ function TermineTab() {
               </select>
             </label>
             <label>{t('res.dauer')}<input type="number" min={0} value={editing.dauer_min ?? 0} onChange={e => setEditing({ ...editing, dauer_min: Number(e.target.value) })} /></label>
+          </div>
+          <div className="participant-picker">
+            <div className="participant-column">
+              <h4>Verfügbare Gruppen / Benutzer</h4>
+              <p className="text-secondary">Einträge per Drag-and-drop oder Klick hinzufügen.</p>
+              <div className="participant-list" onDragOver={event => event.preventDefault()}>
+                {gruppen.map(group => (
+                  <section key={group.gruppe} className="participant-group">
+                    <strong>{group.bereich} ({group.gruppe})</strong>
+                    {group.mitglieder.filter(member => !(editing.teilnehmer || []).includes(member.nummer)).map(member => (
+                      <button key={member.nummer} type="button" className="participant-chip" draggable
+                        onDragStart={event => event.dataTransfer.setData('text/plain', member.nummer)}
+                        onClick={() => addParticipant(member.nummer)}>
+                        <GripVertical size={14} />
+                        <span>{member.bezeichnung}<small>{member.nummer}{member.name ? ` · ${member.name}` : ''}</small></span>
+                      </button>
+                    ))}
+                  </section>
+                ))}
+              </div>
+            </div>
+            <div className="participant-column participant-selected"
+              onDragOver={event => { event.preventDefault(); event.dataTransfer.dropEffect = 'move' }}
+              onDrop={event => { event.preventDefault(); addParticipant(event.dataTransfer.getData('text/plain')) }}>
+              <h4>Teilnehmer am Termin</h4>
+              <p className="text-secondary">{(editing.teilnehmer || []).length} ausgewählt</p>
+              <div className="participant-list">
+                {(editing.teilnehmer || []).map(nummer => {
+                  const member = allMembers.find(item => item.nummer === nummer)
+                  return (
+                    <button key={nummer} type="button" className="participant-chip selected" draggable
+                      onDragStart={event => event.dataTransfer.setData('text/plain', nummer)}
+                      onClick={() => removeParticipant(nummer)}>
+                      <GripVertical size={14} />
+                      <span>{member?.bezeichnung || nummer}<small>{member?.bereich || 'Gruppe'} · {nummer}</small></span>
+                      <X size={14} />
+                    </button>
+                  )
+                })}
+                {(editing.teilnehmer || []).length === 0 && <div className="participant-drop-hint">Benutzer hier ablegen</div>}
+              </div>
+            </div>
           </div>
           <div className="form-actions">
             <button className="btn btn-primary" onClick={save}>{t('res.save')}</button>
@@ -635,7 +694,7 @@ function TermineTab() {
             <thead><tr><th>Nr</th><th>{t('res.bezeichnung')}</th><th>{t('res.intervall')}</th><th>{t('res.dauer')}</th><th></th></tr></thead>
             <tbody>
               {items.map(tm => (
-                <tr key={tm.bespr_nr}>
+                <tr key={tm.bespr_nr} onDoubleClick={() => setEditing({ ...tm, teilnehmer: tm.teilnehmer || [] })} title={t('res.doubleClickEdit')}>
                   <td>{tm.bespr_nr}</td>
                   <td>{tm.bezeichnung}</td>
                   <td>{tm.intervall_text || tm.intervall}</td>

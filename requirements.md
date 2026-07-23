@@ -30,6 +30,15 @@ Describe the current architecture in a implementation.md
 3. Browser Dialog and SIP telephone sessions must remain independent transports so changes to one connection path do not interrupt the other.
 4. Connection attempts must fail within a bounded time, expose an understandable error, and recover visibly when LiveKit reconnects.
 5. Microphone access must start only after an explicit user action and the interface must explain the permission request.
+6. Individual call-history entries can be deleted after confirmation.
+7. Phonebook contacts store an email address and are edited in a modal dialog opened by double-click.
+
+## Resource Editing
+
+1. Groups, people, roles, appointments, rooms, components, planning rules, and phonebook contacts use consistent modal editors.
+2. Double-clicking a list or table entry opens its editor; explicit edit buttons remain available for accessibility.
+3. Meeting editors load persisted user groups and allow participants to be added or removed using drag-and-drop or click controls.
+4. Participant updates are validated and persisted in `termin_teilnehmer`.
 
 ## AI Planning
 

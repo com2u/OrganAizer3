@@ -77,6 +77,18 @@ def get_call(call_id: int) -> dict | None:
     return None
 
 
+def delete_call(call_id: int) -> bool:
+    """Delete one call including its embedded dialog entries."""
+    with _lock:
+        data = _load()
+        remaining = [call for call in data["calls"] if call.get("id") != call_id]
+        if len(remaining) == len(data["calls"]):
+            return False
+        data["calls"] = remaining
+        _save(data)
+    return True
+
+
 def create_call(direction: str, remote_number: str, status: str = "initiated") -> dict:
     with _lock:
         data = _load()

@@ -580,10 +580,14 @@ const T: Translations = {
   'telefonie.pb.cancel': { de: 'Abbrechen', en: 'Cancel' },
   'telefonie.pb.number': { de: 'Rufnummer (+49…)', en: 'Number (+49…)' },
   'telefonie.pb.name': { de: 'Name', en: 'Name' },
+  'telefonie.pb.email': { de: 'E-Mail-Adresse', en: 'Email address' },
   'telefonie.pb.notesPlaceholder': { de: 'Notizen – eine pro Zeile', en: 'Notes – one per line' },
   'telefonie.pb.empty': { de: 'Noch keine Kontakte im Telefonbuch', en: 'No contacts in the phonebook yet' },
   'telefonie.pb.numberRequired': { de: 'Bitte eine Rufnummer angeben.', en: 'Please enter a phone number.' },
   'telefonie.pb.confirmDelete': { de: 'Diesen Kontakt wirklich löschen?', en: 'Really delete this contact?' },
+  'telefonie.deleteCall': { de: 'Telefonat löschen', en: 'Delete call' },
+  'telefonie.confirmDeleteCall': { de: 'Dieses Telefonat mit Dialogverlauf wirklich löschen?', en: 'Really delete this call and its dialog history?' },
+  'res.doubleClickEdit': { de: 'Doppelklicken zum Bearbeiten', en: 'Double-click to edit' },
 
   // Telephony configuration (Twilio / OpenAI / LiveKit)
   'telefonie.secretsNotice': { de: 'Alle Zugangsdaten werden verschlüsselt und ausschließlich serverseitig gespeichert. Secrets werden nie zurückgegeben oder ins Repository übertragen.', en: 'All credentials are stored server-side only. Secrets are never returned or committed to the repository.' },

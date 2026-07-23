@@ -6,7 +6,7 @@ assistant and notes the assistant adds after a call show up in the UI.
 
 The on-disk format matches ``voice/app/phonebook.py``::
 
-    {"contacts": [{"number": "+49...", "name": "...", "notes": ["..."]}]}
+    {"contacts": [{"number": "+49...", "name": "...", "email": "...", "notes": ["..."]}]}
 
 Numbers are normalised (leading ``+`` and digits only) for reliable matching.
 """
@@ -93,14 +93,18 @@ def _clean_contact(payload: dict) -> dict:
         notes = [str(n).strip() for n in raw_notes if str(n).strip()]
     elif isinstance(raw_notes, str):
         notes = [line.strip() for line in raw_notes.splitlines() if line.strip()]
-    return {"number": number, "name": name, "notes": notes}
+    email = str(payload.get("email", "") or "").strip()
+    if email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+        raise ValueError("Ungültige E-Mail-Adresse.")
+    return {"number": number, "name": name, "email": email, "notes": notes}
 
 
 def list_contacts() -> list[dict]:
     with _lock:
         data = _load()
     contacts = data.get("contacts", [])
-    return sorted(contacts, key=lambda c: str(c.get("name", "")).lower())
+    compatible = [{**contact, "email": str(contact.get("email", "") or "")} for contact in contacts]
+    return sorted(compatible, key=lambda c: str(c.get("name", "")).lower())
 
 
 def save_contact(payload: dict) -> dict:
@@ -116,6 +120,7 @@ def save_contact(payload: dict) -> dict:
             if normalize_number(existing.get("number", "")) == original:
                 existing["number"] = contact["number"]
                 existing["name"] = contact["name"]
+                existing["email"] = contact["email"]
                 existing["notes"] = contact["notes"]
                 _save(data)
                 return existing
