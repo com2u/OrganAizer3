@@ -20,6 +20,12 @@ multimodal ingestion, search, contextual chat, transformations, citations, and
 audio generation. Its separate SurrealDB deliberately avoids coupling the
 external application's schema to OrganAIzer's Supabase schema.
 
+The full Next.js studio is served by the existing Nginx Proxy Manager at
+`open-notebook.ai-server.org` and embedded in `WissenView.tsx`. The native
+Flask bridge remains responsible for readiness and the compact notebook
+overview, while the iframe intentionally delegates the complete and evolving
+Open Notebook feature surface to the upstream application.
+
 ## Overview
 
 OrganAIzer is a containerized personal-organization platform that combines a React web application, a Flask API, a Supabase PostgreSQL database, workflow and knowledge integrations, and a LiveKit-based telephone/web voice assistant. The Flask backend remains the security and business-logic boundary: browsers never connect directly to PostgreSQL, while PostgREST is bound to localhost for administrative use. Persistent application data is mounted from the host so rebuilding or uploading containers does not replace the database, telephone book, call history, configuration, or n8n state.

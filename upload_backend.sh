@@ -105,6 +105,11 @@ grep -q '^OPEN_NOTEBOOK_ENCRYPTION_KEY=' .env || echo \"OPEN_NOTEBOOK_ENCRYPTION
 grep -q '^OPEN_NOTEBOOK_PASSWORD=' .env || echo \"OPEN_NOTEBOOK_PASSWORD=\$(openssl rand -hex 24)\" >> .env
 grep -q '^OPEN_NOTEBOOK_DB_PASSWORD=' .env || echo \"OPEN_NOTEBOOK_DB_PASSWORD=\$(openssl rand -hex 24)\" >> .env
 docker compose up -d --build
+# Keep the existing Nginx Proxy Manager connected to the private stack so the
+# Open Notebook HTTPS host can reach UI and API without publishing host ports.
+if docker container inspect nginxreverse-app-1 >/dev/null 2>&1; then
+    docker network connect terminlandschaft_default nginxreverse-app-1 2>/dev/null || true
+fi
 echo 'Ensuring SIP trunk and dispatch rule exist...'
 docker compose exec -T voice-agent python -m app.setup_sip"
 

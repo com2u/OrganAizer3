@@ -4,14 +4,14 @@ import { useTheme } from '../ThemeContext'
 import {
   Search, Clock, Tag, Loader2, FolderOpen, ChevronRight, ChevronDown,
   File, Folder, RefreshCw, Save, AlertTriangle, ArrowUpDown, ArrowUp, ArrowDown,
-  LibraryBig, Plus, ExternalLink, ShieldCheck, Sparkles,
+  LibraryBig, Plus, ExternalLink, ShieldCheck, Sparkles, KeyRound, Check,
 } from 'lucide-react'
 import {
   fetchObsidianTree, searchObsidian, fetchObsidianTags, fetchObsidianRecent,
   fetchObsidianNote, saveObsidianNote,
   ObsidianTreeNode, ObsidianDirNode,
   ObsidianSearchResult, ObsidianTag, ObsidianNote,
-  fetchOpenNotebookStatus, fetchResearchNotebooks, createResearchNotebook,
+  fetchOpenNotebookStatus, fetchOpenNotebookAccess, fetchResearchNotebooks, createResearchNotebook,
   OpenNotebookStatus, ResearchNotebook,
 } from '../api'
 
@@ -583,6 +583,8 @@ function ResearchNotebooksTab() {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [mode, setMode] = useState<'studio' | 'overview'>('studio')
+  const [accessCopied, setAccessCopied] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -617,6 +619,18 @@ function ResearchNotebooksTab() {
     }
   }
 
+  const copyAccess = async () => {
+    try {
+      const access = await fetchOpenNotebookAccess()
+      if (!access.configured || !access.password) throw new Error(t('wissen.researchAccessMissing'))
+      await navigator.clipboard.writeText(access.password)
+      setAccessCopied(true)
+      setTimeout(() => setAccessCopied(false), 2500)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
+
   return (
     <div className="research-workspace">
       <div className="research-hero">
@@ -631,6 +645,45 @@ function ResearchNotebooksTab() {
         </div>
       </div>
 
+      <div className="research-mode-switch" role="tablist" aria-label={t('wissen.research')}>
+        <button className={mode === 'studio' ? 'active' : ''} role="tab" aria-selected={mode === 'studio'} onClick={() => setMode('studio')}>
+          <Sparkles size={14} /> {t('wissen.researchStudio')}
+        </button>
+        <button className={mode === 'overview' ? 'active' : ''} role="tab" aria-selected={mode === 'overview'} onClick={() => setMode('overview')}>
+          <LibraryBig size={14} /> {t('wissen.researchOverview')}
+        </button>
+      </div>
+
+      {!loading && !status?.available && (
+        <div className="research-offline-card">
+          <AlertTriangle size={20} />
+          <div><strong>{t('wissen.researchOfflineTitle')}</strong><p>{t('wissen.researchOfflineHint')}</p></div>
+        </div>
+      )}
+
+      {mode === 'studio' && status?.public_url && (
+        <div className="research-studio-shell">
+          <div className="research-studio-toolbar">
+            <span><ShieldCheck size={14} /> {t('wissen.researchEmbedded')}</span>
+            <div className="research-studio-toolbar-actions">
+              <button onClick={copyAccess}>
+                {accessCopied ? <Check size={14} /> : <KeyRound size={14} />}
+                {accessCopied ? t('wissen.researchAccessCopied') : t('wissen.researchCopyAccess')}
+              </button>
+              <a href={status.public_url} target="_blank" rel="noreferrer"><ExternalLink size={14} /> {t('wissen.researchNewWindow')}</a>
+            </div>
+          </div>
+          <iframe
+            className="research-studio-frame"
+            src={status.public_url}
+            title={t('wissen.researchStudio')}
+            allow="clipboard-read; clipboard-write; microphone; autoplay"
+            referrerPolicy="strict-origin-when-cross-origin"
+          />
+        </div>
+      )}
+
+      {mode === 'overview' && <>
       <div className="research-actions">
         <button className="primary-btn" onClick={() => setShowForm(true)} disabled={!status?.available}>
           <Plus size={15} /> {t('wissen.researchNew')}
@@ -646,13 +699,6 @@ function ResearchNotebooksTab() {
       </div>
 
       {error && <div className="wissen-error"><AlertTriangle size={14} /> {error}</div>}
-      {!loading && !status?.available && (
-        <div className="research-offline-card">
-          <AlertTriangle size={20} />
-          <div><strong>{t('wissen.researchOfflineTitle')}</strong><p>{t('wissen.researchOfflineHint')}</p></div>
-        </div>
-      )}
-
       {showForm && (
         <div className="research-create-card">
           <label>{t('wissen.researchName')}<input autoFocus value={name} onChange={e => setName(e.target.value)} maxLength={160} /></label>
@@ -689,6 +735,7 @@ function ResearchNotebooksTab() {
         <span>{t('wissen.researchChat')}</span>
         <span>{t('wissen.researchAudio')}</span>
       </div>
+      </>}
     </div>
   )
 }

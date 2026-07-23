@@ -94,7 +94,10 @@ services:
       - open-notebook-db
     environment:
       OPEN_NOTEBOOK_ENCRYPTION_KEY: ${OPEN_NOTEBOOK_ENCRYPTION_KEY:-change-this-in-production}
+      # Public entry is protected by the dedicated reverse proxy and can only
+      # be initiated from the authenticated OrganAIzer iframe.
       OPEN_NOTEBOOK_PASSWORD: ${OPEN_NOTEBOOK_PASSWORD:-}
+      API_URL: https://open-notebook.ai-server.org
       SURREAL_URL: ws://open-notebook-db:8000/rpc
       SURREAL_USER: ${OPEN_NOTEBOOK_DB_USER:-root}
       SURREAL_PASSWORD: ${OPEN_NOTEBOOK_DB_PASSWORD:-root}

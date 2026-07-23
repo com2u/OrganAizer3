@@ -11,6 +11,9 @@
 - Open Notebook and SurrealDB data persist below `data/` so backend uploads
   cannot overwrite research content.
 - The full studio is linked only through an explicitly configured HTTPS URL.
+- Since 0.1.16 the complete original studio is embedded as the default view;
+  collections, sources, research, notes, transformations and podcasts must be
+  usable without leaving OrganAIzer.
 
 ## Core Requirements
 

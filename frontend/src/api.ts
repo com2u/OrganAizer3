@@ -87,6 +87,13 @@ export async function fetchOpenNotebookStatus(): Promise<OpenNotebookStatus> {
   return res.json()
 }
 
+export async function fetchOpenNotebookAccess(): Promise<{ configured: boolean; password: string }> {
+  const res = await apiFetch('/open-notebook/access')
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Open Notebook access could not be loaded')
+  return data
+}
+
 export async function fetchResearchNotebooks(): Promise<ResearchNotebook[]> {
   const res = await apiFetch('/open-notebook/notebooks')
   const data = await res.json().catch(() => ({}))

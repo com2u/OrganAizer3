@@ -8,7 +8,7 @@
 
 ---
 
-## Version: 0.1.15 (July 2026)
+## Version: 0.1.16 (July 2026)
 
 ### Research notebooks (Open Notebook)
 
@@ -28,6 +28,12 @@ Production should define `OPEN_NOTEBOOK_ENCRYPTION_KEY`,
 `OPEN_NOTEBOOK_PASSWORD`, and `OPEN_NOTEBOOK_DB_PASSWORD` in `.env`.
 `OPEN_NOTEBOOK_PUBLIC_URL` is optional and enables the full studio link when
 the UI is published behind an HTTPS reverse proxy.
+
+Version 0.1.16 embeds the complete original Open Notebook studio through
+`https://open-notebook.ai-server.org`. Collections, multimodal sources,
+research chat, transformations, notes, model configuration, and podcast
+generation are therefore available without reducing the feature set to the
+small native overview. The overview remains available as a secondary tab.
 
 ## Feature Overview
 

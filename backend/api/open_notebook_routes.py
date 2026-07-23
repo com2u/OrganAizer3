@@ -12,7 +12,9 @@ logger = logging.getLogger(__name__)
 open_notebook_bp = Blueprint("open_notebook", __name__)
 
 _BASE_URL = os.getenv("OPEN_NOTEBOOK_API_URL", "http://open-notebook:5055").rstrip("/")
-_PUBLIC_URL = os.getenv("OPEN_NOTEBOOK_PUBLIC_URL", "").rstrip("/")
+_PUBLIC_URL = os.getenv(
+    "OPEN_NOTEBOOK_PUBLIC_URL", "https://open-notebook.ai-server.org"
+).rstrip("/")
 _PASSWORD = os.getenv("OPEN_NOTEBOOK_PASSWORD", "")
 _TIMEOUT = 12
 
@@ -66,6 +68,12 @@ def status():
 @open_notebook_bp.get("/notebooks")
 def list_notebooks():
     return _forward("GET", "/api/notebooks")
+
+
+@open_notebook_bp.get("/access")
+def access():
+    """Return the studio password only to an authenticated OrganAIzer user."""
+    return jsonify({"configured": bool(_PASSWORD), "password": _PASSWORD})
 
 
 @open_notebook_bp.post("/notebooks")

@@ -10,7 +10,7 @@ test.beforeEach(async ({ page }) => {
 
 test('Recherche-Notebooks integriert Status, Übersicht und Anlage', async ({ page }) => {
   let notebooks = [{ id: 'notebook:1', name: 'Marktanalyse', description: 'Quellen für die Strategie' }]
-  await page.route('**/api/open-notebook/status', route => route.fulfill({ json: { available: true, public_url: '' } }))
+  await page.route('**/api/open-notebook/status', route => route.fulfill({ json: { available: true, public_url: 'https://open-notebook.ai-server.org' } }))
   await page.route('**/api/open-notebook/notebooks', async route => {
     if (route.request().method() === 'POST') {
       const body = route.request().postDataJSON()
@@ -24,6 +24,9 @@ test('Recherche-Notebooks integriert Status, Übersicht und Anlage', async ({ pa
   await page.locator('nav button[title^="Wissen"]').click()
   await page.getByRole('button', { name: 'Recherche-Notebooks' }).click()
   await expect(page.getByText('Quellenbasierte KI-Recherche')).toBeVisible()
+  await expect(page.locator('iframe[title="Recherche-Studio öffnen"]')).toHaveAttribute('src', 'https://open-notebook.ai-server.org')
+  await expect(page.getByRole('button', { name: 'Zugangsschlüssel kopieren' })).toBeVisible()
+  await page.getByRole('tab', { name: 'Notebook-Übersicht' }).click()
   await expect(page.getByText('Marktanalyse')).toBeVisible()
   await expect(page.getByText('Bereit', { exact: true })).toBeVisible()
 
@@ -40,5 +43,6 @@ test('Recherche-Notebooks zeigt einen hilfreichen Offlinezustand', async ({ page
   await page.locator('nav button[title^="Wissen"]').click()
   await page.getByRole('button', { name: 'Recherche-Notebooks' }).click()
   await expect(page.getByText('Recherche-Dienst wird noch gestartet')).toBeVisible()
+  await page.getByRole('tab', { name: 'Notebook-Übersicht' }).click()
   await expect(page.getByRole('button', { name: 'Neues Notebook' })).toBeDisabled()
 })
