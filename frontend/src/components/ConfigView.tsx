@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useTheme } from '../ThemeContext'
 import { fetchConfig, saveConfig } from '../api'
-import { Settings, Volume2, Download, Image, ScanText, BookOpen, Palette, Sun, Moon, Save, Check, Loader2, ScrollText } from 'lucide-react'
+import { Settings, Volume2, Download, Image, ScanText, BookOpen, Palette, Sun, Moon, Save, Check, Loader2, ScrollText, Server } from 'lucide-react'
 import LoggingPanel from './LoggingPanel'
+import SystemView from './SystemView'
 
 interface AppConfig {
   tts_auto_play: boolean
@@ -20,7 +21,7 @@ interface AppConfig {
   hermes_api_url: string
 }
 
-type TabKey = 'appearance' | 'general' | 'tts' | 'youtube' | 'bilder' | 'ocr' | 'obsidian' | 'logs'
+type TabKey = 'appearance' | 'general' | 'tts' | 'youtube' | 'bilder' | 'ocr' | 'obsidian' | 'logs' | 'system'
 
 export default function ConfigView() {
   const { t, theme, lang, setTheme, setLang } = useTheme()
@@ -77,6 +78,7 @@ export default function ConfigView() {
     { key: 'ocr', icon: ScanText, labelKey: 'config.ocr' },
     { key: 'obsidian', icon: BookOpen, labelKey: 'config.obsidian' },
     { key: 'logs', icon: ScrollText, labelKey: 'config.logs' },
+    { key: 'system', icon: Server, labelKey: 'config.system' },
   ]
 
   if (loading) {
@@ -275,6 +277,7 @@ export default function ConfigView() {
             <LoggingPanel />
           </div>
         )}
+        {activeTab === 'system' && <SystemView embedded />}
       </div>
     </section>
   )

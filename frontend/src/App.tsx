@@ -11,7 +11,6 @@ import PlanungView from './components/PlanungView'
 import KIVerbindungView from './components/KIVerbindungView'
 import VerbindungenView from './components/VerbindungenView'
 import ConfigView from './components/ConfigView'
-import SystemView from './components/SystemView'
 import LoginScreen from './components/LoginScreen'
 import LandingPage from './components/LandingPage'
 import { fetchMe, getToken, logout as apiLogout } from './api'
@@ -86,7 +85,6 @@ function App() {
         {category === 'ki_verbindung' && <KIVerbindungView />}
         {category === 'verbindungen' && <VerbindungenView />}
         {category === 'settings' && <ConfigView />}
-        {category === 'system' && <SystemView />}
       </main>
     </div>
   )

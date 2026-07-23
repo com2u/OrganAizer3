@@ -5,7 +5,7 @@ import type { SystemStatus } from '../types'
 
 const bytes = (value: number) => `${(value / 1024 / 1024 / 1024).toFixed(1)} GB`
 
-export default function SystemView() {
+export default function SystemView({ embedded = false }: { embedded?: boolean }) {
   const [status, setStatus] = useState<SystemStatus | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -29,8 +29,8 @@ export default function SystemView() {
   }, [load])
 
   return (
-    <section className="view system-view">
-      <header className="view-header">
+    <section className={`${embedded ? 'config-section' : 'view'} system-view`}>
+      <header className={embedded ? 'system-tab-header' : 'view-header'}>
         <div><span className="eyebrow">MONITORING</span><h1>System</h1><p className="subtitle">Backend-Auslastung und Docker-Dienste</p></div>
         <button className="btn btn-ghost" onClick={() => void load()} disabled={loading}>
           {loading ? <Loader2 size={16} className="spin" /> : <RefreshCw size={16} />} Aktualisieren

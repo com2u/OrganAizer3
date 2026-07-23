@@ -18,7 +18,8 @@ test('System zeigt CPU, RAM und Docker-Zustände', async ({ page }) => {
     }),
   }))
   await login(page)
-  await page.getByTitle('System').click()
+  await page.getByTitle('Einstellungen').click()
+  await page.getByRole('button', { name: 'System' }).click()
   await expect(page.getByRole('heading', { name: 'System' })).toBeVisible()
   await expect(page.locator('.system-metric')).toContainText(['CPU12.5 %', 'RAM37.5 %', 'Container1 / 2'])
   await expect(page.locator('.system-container-list')).toContainText('OrganAIzer')

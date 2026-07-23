@@ -404,6 +404,7 @@ const T: Translations = {
 
   // Logging Panel
   'config.logs': { de: 'Protokoll', en: 'Logs' },
+  'config.system': { de: 'System', en: 'System' },
   'config.logs.title': { de: 'System-Protokoll', en: 'System Logs' },
   'config.logs.desc': { de: 'Frontend- und Backend-Protokolleinträge mit sicherer Schwärzung sensibler Daten.', en: 'Frontend and backend log entries with safe redaction of sensitive data.' },
   'logs.frontend': { de: 'Frontend', en: 'Frontend' },
