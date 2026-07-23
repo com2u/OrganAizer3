@@ -31,6 +31,8 @@ def import_excel(db: DatabaseInterface, filepath: str) -> None:
         _import_intervalle(db, wb["Intervalle"])
         _import_termine(db, wb["Termine"])
         _import_terminliste(db, wb["Terminliste"])
+        if "Planungsregeln" in wb.sheetnames:
+            _import_planungsregeln(db, wb["Planungsregeln"])
     finally:
         wb.close()
 
@@ -144,3 +146,34 @@ def _import_terminliste(db: DatabaseInterface, ws: Any) -> None:
         data,
     )
     logger.info("Imported %d terminliste entries", len(data))
+
+
+def _import_planungsregeln(db: DatabaseInterface, ws: Any) -> None:
+    """Import planning rules; their IDs are assigned automatically in sheet order."""
+    rows = list(ws.iter_rows(min_row=2, values_only=True))
+    data = []
+    for r in rows:
+        if len(r) < 4 or r[3] is None:
+            continue
+        exported_number = r[0] if len(r) > 0 else None
+        bezeichnung = str(r[1]).strip() if len(r) > 1 and r[1] else (
+            f"Regel {exported_number}" if exported_number is not None else "Regel"
+        )
+        typ = str(r[2]).strip() if len(r) > 2 and r[2] else "constraint"
+        if typ not in {"constraint", "preference", "exclusion", "requirement"}:
+            typ = "constraint"
+        bedingung = str(r[3]).strip()
+        try:
+            prioritaet = max(1, min(10, int(r[4]))) if len(r) > 4 and r[4] is not None else 5
+        except (TypeError, ValueError):
+            prioritaet = 5
+        aktiv_value = r[5] if len(r) > 5 else True
+        aktiv = 0 if str(aktiv_value).strip().lower() in {"0", "nein", "no", "false"} else 1
+        data.append((bezeichnung, typ, bedingung, prioritaet, aktiv))
+
+    db.executemany(
+        "INSERT INTO planungsregeln "
+        "(bezeichnung, typ, bedingung, prioritaet, aktiv) VALUES (?, ?, ?, ?, ?)",
+        data,
+    )
+    logger.info("Imported %d planungsregeln", len(data))

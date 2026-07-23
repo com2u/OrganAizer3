@@ -12,6 +12,7 @@ export default function ImportExport({ onImportSuccess }: ImportExportProps) {
   const [importing, setImporting] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
 
   const handleImport = async (file: File) => {
     setImporting(true)
@@ -49,7 +50,8 @@ export default function ImportExport({ onImportSuccess }: ImportExportProps) {
           style={{ display: 'none' }}
           onChange={(e) => {
             const file = e.target.files?.[0]
-            if (file) handleImport(file)
+            if (file) setPendingFile(file)
+            e.target.value = ''
           }}
           disabled={importing}
         />
@@ -59,6 +61,25 @@ export default function ImportExport({ onImportSuccess }: ImportExportProps) {
         {exporting ? t('termine.exporting') : t('termine.export')}
       </button>
       {error && <span className="error">{error}</span>}
+      {pendingFile && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="import-confirm-title">
+          <div className="modal-content">
+            <h2 id="import-confirm-title">Bestehende Daten überschreiben?</h2>
+            <p>
+              Der Import von <strong>{pendingFile.name}</strong> löscht alle bestehenden Termine,
+              Stammdaten und Planungsregeln und ersetzt sie durch den Inhalt der Excel-Datei.
+            </p>
+            <div className="form-actions">
+              <button className="btn btn-danger" onClick={() => {
+                const file = pendingFile
+                setPendingFile(null)
+                void handleImport(file)
+              }}>Alle Daten löschen und importieren</button>
+              <button className="btn btn-ghost" onClick={() => setPendingFile(null)}>Abbrechen</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

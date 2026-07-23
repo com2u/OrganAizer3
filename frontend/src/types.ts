@@ -258,9 +258,38 @@ export interface PlanungsErgebnis {
   hinweis?: string
   ai_response?: string
   vorschlaege: Array<Record<string, unknown>>
-  konflikte: Array<Record<string, unknown>>
+  konflikte: PlanningIssue[]
   bestehende_termine: number
   regeln_geladen: number
+  model?: string
+  summary?: string
+  excel_ready?: boolean
+}
+
+export interface PlanningIssue {
+  severity: 'error' | 'warning' | 'info'
+  title: string
+  description: string
+  related_rules?: number[]
+  related_meetings?: number[]
+}
+
+export interface OpenRouterModel {
+  id: string
+  name: string
+  description: string
+  context_length?: number
+  pricing: Record<string, string>
+}
+
+export interface SystemStatus {
+  cpu_percent: number
+  memory_total: number
+  memory_used: number
+  memory_percent: number
+  containers: Array<{ id: string; name: string; image: string; state: string; status: string }>
+  docker_error?: string | null
+  timestamp: number
 }
 
 export interface Planungsauftrag {

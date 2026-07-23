@@ -2,14 +2,15 @@ import { useEffect, useState, useCallback } from 'react'
 import { useTheme } from '../ThemeContext'
 import {
   List, Play, Plus, Pencil, Trash2, Loader2, AlertTriangle,
-  CheckCircle, XCircle, FileText, Zap, Link2
+  CheckCircle, XCircle, FileText, Zap, Link2, ChevronDown, Search, ShieldCheck, Download
 } from 'lucide-react'
 import {
   fetchPlanungsregeln, createPlanungsregel, updatePlanungsregel, deletePlanungsregel,
-  fetchPlanungsauftraege, createPlanungsauftrag, runPlanungsauftrag, applyPlanungsauftrag,
-  fetchWeeks, fetchAbhaengigkeiten, createAbhaengigkeit, updateAbhaengigkeit, deleteAbhaengigkeit
+  fetchPlanungsauftraege, createPlanungsauftrag, runPlanungsauftrag,
+  fetchWeeks, fetchAbhaengigkeiten, createAbhaengigkeit, updateAbhaengigkeit, deleteAbhaengigkeit,
+  fetchOpenRouterModels, validatePlanning, downloadPlanningExcel
 } from '../api'
-import type { Planungsregel, Planungsauftrag, RegelTyp, Abhaengigkeit, AbhaengigkeitTyp, ZielTyp } from '../types'
+import type { Planungsregel, Planungsauftrag, RegelTyp, Abhaengigkeit, AbhaengigkeitTyp, ZielTyp, OpenRouterModel, PlanningIssue } from '../types'
 
 type Tab = 'regeln' | 'planen' | 'auftraege' | 'abhaengigkeiten'
 
@@ -115,10 +116,11 @@ function RegelnTab() {
       {loading ? <div className="loading-state"><Loader2 size={24} className="spin" /></div> :
         items.length === 0 ? <div className="empty-state"><AlertTriangle size={24} /><p>{t('res.empty')}</p></div> : (
           <table className="resource-table">
-            <thead><tr><th>{t('plan.regel.bezeichnung')}</th><th>{t('plan.regel.typ')}</th><th>{t('plan.regel.bedingung')}</th><th>Prio</th><th>{t('plan.regel.aktiv')}</th><th></th></tr></thead>
+            <thead><tr><th>Nr.</th><th>{t('plan.regel.bezeichnung')}</th><th>{t('plan.regel.typ')}</th><th>{t('plan.regel.bedingung')}</th><th>Prio</th><th>{t('plan.regel.aktiv')}</th><th></th></tr></thead>
             <tbody>
               {items.map(r => (
                 <tr key={r.id}>
+                  <td className="text-secondary">{r.id}</td>
                   <td>{r.bezeichnung}</td>
                   <td><span className={`badge badge-${r.typ}`}>{t(`plan.typ.${r.typ}`)}</span></td>
                   <td className="text-secondary">{r.bedingung}</td>
@@ -151,12 +153,27 @@ function PlanenTab() {
   const [wocheVon, setWocheVon] = useState(1)
   const [wocheBis, setWocheBis] = useState(1)
   const [running, setRunning] = useState(false)
+  const [validating, setValidating] = useState(false)
+  const [rulesOpen, setRulesOpen] = useState(false)
+  const [models, setModels] = useState<OpenRouterModel[]>([])
+  const [model, setModel] = useState('')
+  const [modelSearch, setModelSearch] = useState('')
+  const [issues, setIssues] = useState<PlanningIssue[] | null>(null)
+  const [issueTitle, setIssueTitle] = useState('')
   const [result, setResult] = useState<Planungsauftrag | null>(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    fetchPlanungsregeln().then(r => setRegeln(r.filter(x => x.aktiv))).catch(() => {})
+    fetchPlanungsregeln().then(r => {
+      const active = r.filter(x => x.aktiv)
+      setRegeln(active)
+      setSelectedRegeln(active.map(rule => rule.id))
+    }).catch(() => {})
     fetchWeeks().then(w => { setWeeks(w); if (w.length) { setWocheVon(w[0]); setWocheBis(w[w.length - 1]) } }).catch(() => {})
+    fetchOpenRouterModels().then(data => {
+      setModels(data.models)
+      setModel(data.models.some(item => item.id === data.default) ? data.default : data.models[0]?.id || '')
+    }).catch((e: any) => setError(e.message))
   }, [])
 
   const toggleRegel = (id: number) => {
@@ -171,20 +188,42 @@ function PlanenTab() {
         woche_bis: wocheBis,
         regel_ids: selectedRegeln,
         run_ai: runAi,
+        model,
       })
       setResult(r)
+      const conflicts = r.ergebnis?.konflikte || []
+      if (conflicts.length) {
+        setIssueTitle('Hinweise aus der Planung')
+        setIssues(conflicts)
+      }
     } catch (e: any) { setError(e.message) }
     finally { setRunning(false) }
   }
 
-  const applyResult = async () => {
-    if (!result) return
+  const runValidation = async () => {
+    setValidating(true)
+    setError('')
     try {
-      await applyPlanungsauftrag(result.id)
-      setResult(null)
-      setError('')
+      const validation = await validatePlanning({
+        woche_von: wocheVon,
+        woche_bis: wocheBis,
+        regel_ids: selectedRegeln,
+        model,
+      })
+      setIssueTitle(validation.valid ? 'Validierung abgeschlossen' : 'Unstimmigkeiten gefunden')
+      setIssues(validation.issues.length ? validation.issues : [{
+        severity: 'info',
+        title: 'Keine Widersprüche erkannt',
+        description: validation.summary || 'Die ausgewählten Regeln und Meetingvorgaben sind grundsätzlich konsistent.',
+      }])
     } catch (e: any) { setError(e.message) }
+    finally { setValidating(false) }
   }
+
+  const allSelected = regeln.length > 0 && selectedRegeln.length === regeln.length
+  const filteredModels = models.filter(item =>
+    `${item.name} ${item.id} ${item.description}`.toLowerCase().includes(modelSearch.toLowerCase())
+  )
 
   return (
     <div className="resource-panel">
@@ -205,14 +244,30 @@ function PlanenTab() {
           </label>
         </div>
 
-        <div style={{ margin: '1rem 0' }}>
-          <h4>{t('plan.selectRegeln')}</h4>
-          {regeln.length === 0 ? <p className="text-secondary">{t('res.empty')}</p> : (
-            <div className="checkbox-list">
+        <div className="planning-model-picker">
+          <label>OpenRouter-Modell</label>
+          <div className="model-search"><Search size={15} /><input value={modelSearch} onChange={e => setModelSearch(e.target.value)} placeholder="Modelle durchsuchen…" /></div>
+          <select value={model} onChange={e => setModel(e.target.value)}>
+            {filteredModels.map(item => <option key={item.id} value={item.id}>{item.name} · {item.id}</option>)}
+          </select>
+          {model && <small className="text-secondary">{models.find(item => item.id === model)?.description}</small>}
+        </div>
+
+        <div className="planning-rules">
+          <button type="button" className="planning-rules-summary" onClick={() => setRulesOpen(value => !value)} aria-expanded={rulesOpen}>
+            <ChevronDown size={17} className={rulesOpen ? 'expanded' : ''} />
+            <span><strong>{t('plan.selectRegeln')}</strong><small>{selectedRegeln.length} von {regeln.length} ausgewählt</small></span>
+          </button>
+          {rulesOpen && (
+            <div className="checkbox-list planning-rule-details">
+              <label className="checkbox-item select-all">
+                <input type="checkbox" checked={allSelected} onChange={() => setSelectedRegeln(allSelected ? [] : regeln.map(rule => rule.id))} />
+                <span>Alle Regeln auswählen</span>
+              </label>
               {regeln.map(r => (
                 <label key={r.id} className="checkbox-item">
                   <input type="checkbox" checked={selectedRegeln.includes(r.id)} onChange={() => toggleRegel(r.id)} />
-                  <span>{r.bezeichnung} <small className="text-secondary">({t(`plan.typ.${r.typ}`)})</small></span>
+                  <span><strong>#{r.id} {r.bezeichnung}</strong><small className="text-secondary">{r.bedingung}</small></span>
                 </label>
               ))}
             </div>
@@ -220,10 +275,13 @@ function PlanenTab() {
         </div>
 
         <div className="form-actions">
-          <button className="btn btn-primary" onClick={() => runPlanning(true)} disabled={running}>
+          <button className="btn btn-primary" onClick={() => runPlanning(true)} disabled={running || validating || !model || !selectedRegeln.length}>
             {running ? <><Loader2 size={16} className="spin" /> {t('plan.running')}</> : <><Play size={16} /> {t('plan.run_ai')}</>}
           </button>
-          <button className="btn btn-ghost" onClick={() => runPlanning(false)} disabled={running}>
+          <button className="btn btn-secondary" onClick={runValidation} disabled={running || validating || !model || !selectedRegeln.length}>
+            {validating ? <><Loader2 size={16} className="spin" /> Validierung läuft…</> : <><ShieldCheck size={16} /> Validieren</>}
+          </button>
+          <button className="btn btn-ghost" onClick={() => runPlanning(false)} disabled={running || validating}>
             <FileText size={16} /> {t('plan.create_draft')}
           </button>
         </div>
@@ -252,21 +310,35 @@ function PlanenTab() {
                 <span>{t('plan.vorschlaege')}: {result.ergebnis.vorschlaege?.length || 0}</span>
                 <span>{t('plan.konflikte')}: {result.ergebnis.konflikte?.length || 0}</span>
               </div>
-              {result.ergebnis.ai_response && (
-                <details style={{ marginTop: '1rem' }}>
-                  <summary>KI-Antwort</summary>
-                  <pre className="ai-response">{result.ergebnis.ai_response}</pre>
-                </details>
-              )}
+              {result.ergebnis.summary && <p>{result.ergebnis.summary}</p>}
               {result.status === 'vorschlag' && result.ergebnis.vorschlaege && result.ergebnis.vorschlaege.length > 0 && (
                 <div className="form-actions" style={{ marginTop: '1rem' }}>
-                  <button className="btn btn-primary" onClick={applyResult}>
-                    <CheckCircle size={16} /> {t('plan.apply')}
+                  <button className="btn btn-primary" onClick={() => downloadPlanningExcel(result.id).catch((e: any) => setError(e.message))}>
+                    <Download size={16} /> Excel-Vorschlag herunterladen
                   </button>
                 </div>
               )}
             </div>
           )}
+        </div>
+      )}
+      {issues && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="planning-issues-title">
+          <div className="modal-content planning-issues-modal">
+            <h2 id="planning-issues-title">{issueTitle}</h2>
+            <div className="planning-issue-list">
+              {issues.map((issue, index) => (
+                <article key={index} className={`planning-issue issue-${issue.severity || 'info'}`}>
+                  <strong>{issue.title}</strong>
+                  <p>{issue.description}</p>
+                  {(issue.related_rules?.length || issue.related_meetings?.length) ? (
+                    <small>Regeln: {issue.related_rules?.join(', ') || '–'} · Meetings: {issue.related_meetings?.join(', ') || '–'}</small>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+            <div className="form-actions"><button className="btn btn-primary" onClick={() => setIssues(null)}>Schließen</button></div>
+          </div>
         </div>
       )}
     </div>

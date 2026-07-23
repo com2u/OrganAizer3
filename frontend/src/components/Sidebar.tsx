@@ -1,7 +1,7 @@
 import { User } from '../types'
 import { useTheme } from '../ThemeContext'
 import packageJson from '../../package.json'
-import { Bot, Calendar, CheckSquare, Mic, BookOpen, Phone, Settings, LogOut, Users, ClipboardList, Cable, Plug } from 'lucide-react'
+import { Bot, Calendar, CheckSquare, Mic, BookOpen, Phone, Settings, LogOut, Users, ClipboardList, Cable, Plug, Server } from 'lucide-react'
 
 export type CategoryKey =
   | 'assistent'
@@ -15,6 +15,7 @@ export type CategoryKey =
   | 'ki_verbindung'
   | 'verbindungen'
   | 'settings'
+  | 'system'
 
 interface NavDef {
   key: CategoryKey
@@ -91,6 +92,14 @@ export default function Sidebar({ active, onSelect, user, onLogout }: SidebarPro
           <strong>{displayName}</strong>
           <small>{user.role || t('sidebar.loggedIn')}</small>
         </span>
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={() => onSelect('system')}
+          title="System"
+        >
+          <Server size={16} />
+        </button>
         <button
           type="button"
           className="icon-btn"

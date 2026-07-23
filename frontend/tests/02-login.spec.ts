@@ -41,9 +41,9 @@ test.describe('Login Flow', () => {
     await expect(sharedPage.locator('nav').getByText('admin')).toBeVisible()
   })
 
-  test('version v0.1.10 shown in sidebar', async () => {
+  test('version v0.1.11 shown in sidebar', async () => {
     // Already logged in
-    await expect(sharedPage.locator('nav').getByText('v0.1.10')).toBeVisible()
+    await expect(sharedPage.locator('nav').getByText('v0.1.11')).toBeVisible()
   })
 
   test('logout returns to landing page', async () => {
@@ -54,10 +54,17 @@ test.describe('Login Flow', () => {
 
   test('invalid credentials show error', async () => {
     // On landing page after logout
+    await sharedPage.route('**/api/auth/login', route => route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'E-Mail oder Passwort ist falsch' }),
+    }))
     await sharedPage.getByRole('button', { name: 'Anmelden' }).first().click()
     await sharedPage.locator('input[type="email"]').fill('wrong@example.com')
     await sharedPage.locator('input[type="password"]').fill('wrongpassword')
     await sharedPage.getByRole('button', { name: 'Anmelden' }).click()
     await expect(sharedPage.locator('nav')).not.toBeVisible({ timeout: 3_000 })
+    await expect(sharedPage.getByText('E-Mail oder Passwort ist falsch')).toBeVisible()
+    await sharedPage.unroute('**/api/auth/login')
   })
 })

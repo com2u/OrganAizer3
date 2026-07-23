@@ -63,4 +63,35 @@ test.describe('Sprache - Text vorlesen (TTS)', () => {
     await textarea.fill(longText)
     await expect(textarea).toHaveValue(longText)
   })
+
+  test('protected TTS audio is loaded into a playable browser source', async () => {
+    let audioRequestWasAuthenticated = false
+    await sharedPage.route('**/api/tts/generate', async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ audio_url: '/api/tts/file/test/speech.mp3' }),
+      })
+    })
+    await sharedPage.route('**/api/tts/file/test/speech.mp3', async route => {
+      audioRequestWasAuthenticated = Boolean(route.request().headers().authorization)
+      await route.fulfill({
+        status: 200,
+        contentType: 'audio/mpeg',
+        body: Buffer.from([0x49, 0x44, 0x33, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]),
+      })
+    })
+
+    await sharedPage.locator('textarea').first().fill('Guten Tag')
+    await sharedPage.locator('.primary-btn').click()
+
+    const player = sharedPage.locator('.tts-result audio')
+    await expect(player).toBeVisible()
+    await expect(player).toHaveAttribute('src', /^blob:/)
+    await expect(sharedPage.getByRole('meter', { name: 'Audiopegel' })).toBeVisible()
+    expect(audioRequestWasAuthenticated).toBe(true)
+
+    await sharedPage.unroute('**/api/tts/generate')
+    await sharedPage.unroute('**/api/tts/file/test/speech.mp3')
+  })
 })

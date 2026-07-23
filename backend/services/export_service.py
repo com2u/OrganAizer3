@@ -24,9 +24,60 @@ def export_excel(db: DatabaseInterface, filepath: str) -> None:
     _export_termine(db, wb)
     _export_terminliste(db, wb)
     _export_intervalle(db, wb)
+    _export_planungsregeln(db, wb)
 
     wb.save(filepath)
     logger.info("Export completed: %s", filepath)
+
+
+def export_planning_excel(
+    db: DatabaseInterface,
+    filepath: str,
+    proposals: list[dict],
+    week_from: int,
+    week_to: int,
+) -> None:
+    """Export a normal workbook whose Terminliste contains the AI proposal."""
+    export_excel(db, filepath)
+    workbook = openpyxl.load_workbook(filepath)
+    sheet = workbook["Terminliste"]
+    retained = [list(row) for row in sheet.iter_rows(min_row=2, values_only=True)
+                if row[0] is not None and not week_from <= int(row[0]) <= week_to]
+    sheet.delete_rows(2, max(0, sheet.max_row - 1))
+    for row in retained:
+        sheet.append(row)
+    for proposal in proposals:
+        try:
+            meeting_number = int(proposal["bespr_nr"])
+            week = int(proposal["woche"])
+            day = str(proposal["tag"])
+            start = str(proposal["start"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if week < week_from or week > week_to or day not in {"Mon", "Tue", "Wed", "Thu", "Fri"}:
+            continue
+        meeting = db.fetchone(
+            "SELECT bezeichnung, intervall, dauer_min FROM termine WHERE bespr_nr = ?",
+            (meeting_number,),
+        )
+        if not meeting:
+            continue
+        participants = db.fetchall(
+            "SELECT usergruppe FROM termin_teilnehmer WHERE bespr_nr = ? ORDER BY usergruppe",
+            (meeting_number,),
+        )
+        sheet.append([
+            week,
+            day,
+            start,
+            _add_minutes(start, meeting["dauer_min"]),
+            meeting_number,
+            meeting["bezeichnung"],
+            meeting["intervall"],
+            meeting["dauer_min"],
+            ", ".join(row["usergruppe"] for row in participants),
+        ])
+    workbook.save(filepath)
 
 
 def _export_bereiche(db: DatabaseInterface, wb: openpyxl.Workbook) -> None:
@@ -171,3 +222,27 @@ def _export_intervalle(db: DatabaseInterface, wb: openpyxl.Workbook) -> None:
     for r in rows:
         ws.append([r["kuerzel"], r["bedeutung"]])
     logger.info("Exported %d intervalle", len(rows))
+
+
+def _export_planungsregeln(db: DatabaseInterface, wb: openpyxl.Workbook) -> None:
+    """Export editable planning rules as a dedicated worksheet."""
+    ws = wb.create_sheet("Planungsregeln")
+    ws.append(["Nr.", "Bezeichnung", "Typ", "Regel", "Priorität", "Aktiv"])
+    rows = db.fetchall(
+        "SELECT id, bezeichnung, typ, bedingung, prioritaet, aktiv "
+        "FROM planungsregeln ORDER BY id"
+    )
+    for r in rows:
+        ws.append([
+            r["id"],
+            r["bezeichnung"],
+            r["typ"],
+            r["bedingung"],
+            r["prioritaet"],
+            "Ja" if r["aktiv"] else "Nein",
+        ])
+    ws.freeze_panes = "A2"
+    widths = (10, 28, 18, 100, 12, 10)
+    for index, width in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(index)].width = width
+    logger.info("Exported %d planungsregeln", len(rows))

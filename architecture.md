@@ -15,9 +15,11 @@ flowchart LR
     API -->|SQL via psycopg| DB[(Supabase PostgreSQL)]
     API -->|Files| DATA[(Persistent data)]
     API -->|Agent requests| H[Hermes agent]
+    API -->|Validation and planning| OR[OpenRouter]
     API -->|Vault access| O[(Obsidian vault)]
     API -->|Workflow API| N[n8n]
     API -->|Control API| VW[Voice web/control server]
+    API -->|Read status through socket| DOCKER[Docker Engine]
     SIP --> LK
     LK --> VA[Voice agent]
     VA -->|Tools and context| H
@@ -53,6 +55,7 @@ flowchart TD
     PG --> SUPABASE[(Supabase PostgreSQL)]
     SQLITE --> SQLITEFILE[(SQLite file)]
     ROUTES --> SERVICES[backend/services]
+    SERVICES --> OPENROUTER[OpenRouter API]
     ROUTES --> TELEPHONY[backend/telephony]
     TELEPHONY --> VOICEWEB[voice/app/web_server.py]
     VOICEWEB --> LIVEKIT[LiveKit]
@@ -113,7 +116,8 @@ OrganAizer3/
 │   ├── services/
 │   │   ├── __init__.py             # Marks reusable backend services as a package.
 │   │   ├── import_service.py        # Imports schedule workbook data into the selected database.
-│   │   └── export_service.py        # Exports schedule data from the selected database to Excel.
+│   │   ├── export_service.py        # Exports database data and AI planning proposals to compatible Excel files.
+│   │   └── openrouter_service.py    # Lists OpenRouter models and requests structured validation or planning results.
 │   └── telephony/
 │       ├── __init__.py              # Marks main-backend telephony helpers as a package.
 │       ├── config_store.py          # Reads and safely persists telephone configuration.
@@ -156,6 +160,7 @@ OrganAizer3/
 │   │   │   ├── AppointmentDetail.tsx # Displays details for a selected appointment.
 │   │   │   ├── RessourcenView.tsx   # Manages people, roles, rooms, components, groups, and meeting resources.
 │   │   │   ├── PlanungView.tsx      # Manages rules and AI-supported planning jobs.
+│   │   │   ├── SystemView.tsx       # Monitors backend CPU, RAM, and Docker container states.
 │   │   │   ├── TelefonieView.tsx    # Manages SIP settings, phonebook, calls, and the web telephone assistant.
 │   │   │   ├── DialogView.tsx       # Provides the browser voice-dialog experience.
 │   │   │   ├── SpracheView.tsx      # Provides text-to-speech, speech-to-text, and dictation tools.

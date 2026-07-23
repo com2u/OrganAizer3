@@ -31,6 +31,19 @@ Describe the current architecture in a implementation.md
 4. Connection attempts must fail within a bounded time, expose an understandable error, and recover visibly when LiveKit reconnects.
 5. Microphone access must start only after an explicit user action and the interface must explain the permission request.
 
+## AI Planning
+
+1. All active planning rules are selected by default; detailed rules remain collapsed until requested and can then be deselected individually.
+2. Validation and planning use OpenRouter with a searchable choice of available text models.
+3. Validation checks rules, meetings, intervals, durations, participants, and fixed appointments for contradictions and reports findings in a modal dialog.
+4. Planning returns structured appointment proposals and reports unresolved conflicts or ambiguities instead of silently ignoring them.
+5. A planning result is downloadable as an Excel workbook compatible with the schedule import/export format.
+6. Excel imports overwrite existing database content only after an explicit frontend warning and a mandatory backend confirmation flag.
+
+## System Monitoring
+
+Authenticated users can inspect backend CPU and RAM usage and the running, stopped, or failed state of Docker containers from the System view.
+
 ## Startup
 
 Create a ./start.sh to start the application

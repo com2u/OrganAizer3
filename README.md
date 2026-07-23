@@ -8,7 +8,7 @@
 
 ---
 
-## Version: 0.1.10 (July 2026)
+## Version: 0.1.11 (July 2026)
 
 ## Feature Overview
 
@@ -45,6 +45,13 @@
 - 8 Providers: Ollama, llama.cpp, Amazon Bedrock, Copilot, OpenAI, Claude, Gemini, OpenRouter.
 - Categories: Lokal, Eigen, Cloud. Secret-based API key management.
 
+### Planung und System
+- OpenRouter-based rule validation and scheduling with searchable model selection.
+- All active rules are selected by default; individual rules are available in a collapsed detail panel.
+- Planning results are downloadable as import-compatible Excel workbooks before any data is replaced.
+- Excel imports require explicit confirmation in both frontend and backend because they overwrite schedule data.
+- The System view monitors CPU, RAM and Docker container health.
+
 ### Theme & Language
 - Dark/Light mode toggle. German/English language switch.
 
@@ -74,6 +81,9 @@ bash upload_frontend.sh  # builds + uploads to ionos
 
 # Docker
 sudo docker compose build && sudo docker compose up -d
+
+# Required for OpenRouter planning (store only in .env)
+OPENROUTER_API_KEY=...
 
 # Tests
 cd frontend && npm test              # all 84 tests

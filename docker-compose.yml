@@ -23,6 +23,8 @@ services:
       - ./.env:/app/.env:ro
       # Persist logs on the host
       - ./log.txt:/app/log.txt
+      # Read Docker health/status for the authenticated System monitor.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
       # Obsidian vault directory (all user vaults; access is enforced per-user in the app)
       # SECURITY: Do NOT mount to /app/obsidian/<user> – user isolation is enforced
       # by the application via OBSIDIAN_ROOT + authenticated email containment check.

@@ -13,12 +13,8 @@ test.describe('Landing Page', () => {
 
   test('shows product preview section', async ({ page }) => {
     await gotoLanding(page)
-    await expect(page.getByText('Produktvorschau')).toBeVisible()
-    // Bento cells
-    await expect(page.getByRole('heading', { name: 'Termine & Planung' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Aufgaben & Ressourcen' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'KI-Verbindungen' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Sprache & Wissen' })).toBeVisible()
+    await expect(page.getByRole('img', { name: 'Produktvorschau' })).toBeVisible()
+    await expect(page.locator('.preview-shell')).toContainText('OrganAIzer')
   })
 
   test('shows workflow steps section', async ({ page }) => {

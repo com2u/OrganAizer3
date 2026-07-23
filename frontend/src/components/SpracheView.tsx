@@ -1,17 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useTheme } from '../ThemeContext'
 import { Volume2, Mic, MicOff, Play, Loader2, Download, Copy, Check, ArrowRight, FileText, MessagesSquare } from 'lucide-react'
-import { generateTTS, transcribeAudio, transcribeBlob } from '../api'
+import { fetchTTSAudio, generateTTS, transcribeAudio, transcribeBlob } from '../api'
 import DialogView from './DialogView'
-
-// API_BASE matches the value from api.ts (VITE_API_BASE or '/api')
-const API_BASE = import.meta.env.VITE_API_BASE ?? '/api'
-
-/** Build a full API URL from a relative path like '/tts/file/...' */
-function apiUrl(path: string): string {
-  const cleanPath = path.replace(/^\/api/, '')
-  return `${API_BASE}${cleanPath}`
-}
 
 type SpracheTab = 'tts' | 'stt' | 'dictation' | 'dialog'
 type DictationStatus = 'idle' | 'requesting' | 'recording' | 'stopping' | 'transcribing' | 'error'
@@ -26,6 +17,11 @@ export default function SpracheView() {
   const [ttsSpeed, setTtsSpeed] = useState('1.0')
   const [ttsDownloading, setTtsDownloading] = useState(false)
   const [ttsResult, setTtsResult] = useState<string | null>(null)
+  const [ttsLevel, setTtsLevel] = useState(0)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const ttsAudioContextRef = useRef<AudioContext | null>(null)
+  const ttsAnalyserRef = useRef<AnalyserNode | null>(null)
+  const ttsAnimationRef = useRef<number | null>(null)
 
   // STT file state
   const [sttFile, setSttFile] = useState<File | null>(null)
@@ -42,6 +38,57 @@ export default function SpracheView() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const streamRef = useRef<MediaStream | null>(null)
+  const [dictLevel, setDictLevel] = useState(0)
+  const dictAudioContextRef = useRef<AudioContext | null>(null)
+  const dictAnimationRef = useRef<number | null>(null)
+
+  const stopLevelAnimation = useCallback((kind: 'tts' | 'dictation') => {
+    const ref = kind === 'tts' ? ttsAnimationRef : dictAnimationRef
+    if (ref.current !== null) cancelAnimationFrame(ref.current)
+    ref.current = null
+    if (kind === 'tts') setTtsLevel(0)
+    else setDictLevel(0)
+  }, [])
+
+  const animateLevel = useCallback((
+    analyser: AnalyserNode,
+    kind: 'tts' | 'dictation',
+  ) => {
+    const values = new Uint8Array(analyser.fftSize)
+    const ref = kind === 'tts' ? ttsAnimationRef : dictAnimationRef
+    const update = () => {
+      analyser.getByteTimeDomainData(values)
+      let sum = 0
+      for (const value of values) {
+        const normalized = (value - 128) / 128
+        sum += normalized * normalized
+      }
+      const level = Math.min(100, Math.sqrt(sum / values.length) * 320)
+      if (kind === 'tts') setTtsLevel(level)
+      else setDictLevel(level)
+      ref.current = requestAnimationFrame(update)
+    }
+    stopLevelAnimation(kind)
+    update()
+  }, [stopLevelAnimation])
+
+  const startTtsMeter = useCallback(async () => {
+    const audio = audioRef.current
+    if (!audio) return
+    let context = ttsAudioContextRef.current
+    let analyser = ttsAnalyserRef.current
+    if (!context || !analyser) {
+      context = new AudioContext()
+      analyser = context.createAnalyser()
+      analyser.fftSize = 256
+      context.createMediaElementSource(audio).connect(analyser)
+      analyser.connect(context.destination)
+      ttsAudioContextRef.current = context
+      ttsAnalyserRef.current = analyser
+    }
+    if (context.state === 'suspended') await context.resume()
+    animateLevel(analyser, 'tts')
+  }, [animateLevel])
 
   const handleTTS = async () => {
     if (!ttsText.trim()) { alert(t('sprache.enterText')); return }
@@ -49,13 +96,10 @@ export default function SpracheView() {
     setTtsResult(null)
     try {
       const data = await generateTTS(ttsText, ttsVoice, ttsSpeed)
-      const audioUrl = data.audio_url ? apiUrl(data.audio_url) : null
+      if (!data.audio_url) throw new Error('Keine Audiodatei empfangen / No audio file received')
+      const audioBlob = await fetchTTSAudio(data.audio_url)
+      const audioUrl = URL.createObjectURL(audioBlob)
       setTtsResult(audioUrl)
-      const autoPlay = localStorage.getItem('tts_auto_play') !== 'false'
-      if (autoPlay && audioUrl) {
-        const audio = new Audio(audioUrl)
-        audio.play()
-      }
     } catch (error: unknown) {
       alert(error instanceof Error ? error.message : String(error))
     } finally {
@@ -87,6 +131,12 @@ export default function SpracheView() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
+      const context = new AudioContext()
+      const analyser = context.createAnalyser()
+      analyser.fftSize = 256
+      context.createMediaStreamSource(stream).connect(analyser)
+      dictAudioContextRef.current = context
+      animateLevel(analyser, 'dictation')
 
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
@@ -119,14 +169,17 @@ export default function SpracheView() {
         setDictError(t('dictation.startError'))
       }
     }
-  }, [t])
+  }, [animateLevel, t])
 
   const stopStream = useCallback(() => {
+    stopLevelAnimation('dictation')
+    dictAudioContextRef.current?.close().catch(() => undefined)
+    dictAudioContextRef.current = null
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop())
       streamRef.current = null
     }
-  }, [])
+  }, [stopLevelAnimation])
 
   const stopDictation = useCallback(async () => {
     const recorder = mediaRecorderRef.current
@@ -170,8 +223,28 @@ export default function SpracheView() {
         streamRef.current.getTracks().forEach(track => track.stop())
         streamRef.current = null
       }
+      stopLevelAnimation('tts')
+      stopLevelAnimation('dictation')
+      ttsAudioContextRef.current?.close().catch(() => undefined)
+      dictAudioContextRef.current?.close().catch(() => undefined)
     }
-  }, [])
+  }, [stopLevelAnimation])
+
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio || !ttsResult) return
+    audio.load()
+    if (localStorage.getItem('tts_auto_play') !== 'false') {
+      audio.play().catch(() => undefined)
+    }
+    return () => {
+      stopLevelAnimation('tts')
+      ttsAudioContextRef.current?.close().catch(() => undefined)
+      ttsAudioContextRef.current = null
+      ttsAnalyserRef.current = null
+      URL.revokeObjectURL(ttsResult)
+    }
+  }, [stopLevelAnimation, ttsResult])
 
   const copyToClipboard = (text: string, setCopied: (v: boolean) => void) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -208,14 +281,18 @@ export default function SpracheView() {
             <div className="form-group">
               <label>{t('sprache.voice')}</label>
               <select value={ttsVoice} onChange={e => setTtsVoice(e.target.value)}>
-                <option value="de-DE-KatjaNeural">Katja (DE)</option>
-                <option value="de-DE-KillianNeural">Killian (DE)</option>
-                <option value="de-DE-AmalaNeural">Amala (DE)</option>
-                <option value="de-DE-ConradNeural">Conrad (DE)</option>
-                <option value="en-US-AvaNeural">Ava (EN-US)</option>
-                <option value="en-US-AndrewNeural">Andrew (EN-US)</option>
-                <option value="en-GB-SoniaNeural">Sonia (EN-GB)</option>
-                <option value="en-GB-RyanNeural">Ryan (EN-GB)</option>
+                <optgroup label="Deutsch">
+                  <option value="de-DE-KatjaNeural">Katja (Deutsch)</option>
+                  <option value="de-DE-KillianNeural">Killian (Deutsch)</option>
+                  <option value="de-DE-AmalaNeural">Amala (Deutsch)</option>
+                  <option value="de-DE-ConradNeural">Conrad (Deutsch)</option>
+                </optgroup>
+                <optgroup label="English">
+                  <option value="en-US-AvaNeural">Ava (English US)</option>
+                  <option value="en-US-AndrewNeural">Andrew (English US)</option>
+                  <option value="en-GB-SoniaNeural">Sonia (English UK)</option>
+                  <option value="en-GB-RyanNeural">Ryan (English UK)</option>
+                </optgroup>
               </select>
             </div>
             <div className="form-group">
@@ -235,7 +312,17 @@ export default function SpracheView() {
           {ttsResult && (
             <div className="tts-result">
               <p>{t('sprache.audioSuccess')}</p>
-              <audio controls src={ttsResult} autoPlay />
+              <audio
+                ref={audioRef}
+                controls
+                src={ttsResult}
+                onPlay={() => { void startTtsMeter() }}
+                onPause={() => stopLevelAnimation('tts')}
+                onEnded={() => stopLevelAnimation('tts')}
+              />
+              <div className="audio-level" role="meter" aria-label="Audiopegel" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(ttsLevel)}>
+                <span style={{ width: `${Math.max(2, ttsLevel)}%` }} />
+              </div>
               <a href={ttsResult} download className="download-link"><Download size={14} /> {t('sprache.downloadAudio')}</a>
             </div>
           )}
@@ -307,9 +394,14 @@ export default function SpracheView() {
             ) : null}
 
             {dictStatus === 'recording' && (
-              <span className="recording-indicator">
-                <span className="recording-dot" /> {t('dictation.recording')}
-              </span>
+              <>
+                <span className="recording-indicator">
+                  <span className="recording-dot" /> {t('dictation.recording')}
+                </span>
+                <div className="audio-level recording-level" role="meter" aria-label="Mikrofonpegel" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(dictLevel)}>
+                  <span style={{ width: `${Math.max(2, dictLevel)}%` }} />
+                </div>
+              </>
             )}
           </div>
 

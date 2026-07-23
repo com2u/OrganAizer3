@@ -2,12 +2,15 @@
 
 import json
 import logging
+import os
+import tempfile
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, after_this_request, jsonify, request, send_file
 
 from backend import auth
 from backend.db.factory import get_database
 from backend.db.interface import DatabaseInterface
+from backend.services.openrouter_service import DEFAULT_MODEL, OpenRouterError, chat_json, list_models
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +46,7 @@ def _read_config() -> dict:
 def list_regeln():
     db = _get_db()
     try:
-        rows = db.fetchall("SELECT * FROM planungsregeln ORDER BY prioritaet, bezeichnung")
+        rows = db.fetchall("SELECT * FROM planungsregeln ORDER BY id")
         return jsonify(rows)
     finally:
         db.disconnect()
@@ -69,8 +72,6 @@ def create_regel():
     body = request.get_json(silent=True) or {}
     bez = (body.get("bezeichnung") or "").strip()
     bedingung = (body.get("bedingung") or "").strip()
-    if not bez:
-        return jsonify({"error": "Bezeichnung ist erforderlich"}), 400
     if not bedingung:
         return jsonify({"error": "Bedingung ist erforderlich"}), 400
     typ = body.get("typ", "constraint")
@@ -81,6 +82,9 @@ def create_regel():
         return jsonify({"error": "Priorität muss zwischen 1 und 10 liegen"}), 400
     db = _get_db()
     try:
+        if not bez:
+            next_row = db.fetchone("SELECT COALESCE(MAX(id), 0) + 1 AS nummer FROM planungsregeln")
+            bez = f"Regel {next_row['nummer']}"
         db.execute(
             "INSERT INTO planungsregeln (bezeichnung, typ, bedingung, prioritaet, aktiv) VALUES (?, ?, ?, ?, ?)",
             (bez, typ, bedingung, prio, 1 if body.get("aktiv", True) else 0),
@@ -135,6 +139,42 @@ def delete_regel(rid: int):
 
 # ===== Planungsaufträge =====
 
+@planning_bp.route("/models", methods=["GET"])
+def openrouter_models():
+    try:
+        return jsonify({"models": list_models(), "default": DEFAULT_MODEL})
+    except OpenRouterError as exc:
+        return jsonify({"error": str(exc)}), 502
+
+
+@planning_bp.route("/validate", methods=["POST"])
+def validate_planning():
+    body = request.get_json(silent=True) or {}
+    rule_ids = body.get("regel_ids", [])
+    model = (body.get("model") or DEFAULT_MODEL).strip()
+    db = _get_db()
+    try:
+        context = _planning_context(db, body.get("woche_von", 1), body.get("woche_bis", 53), rule_ids)
+        result = chat_json(
+            model,
+            "Du bist ein strenger Terminplanungs-Prüfer. Antworte ausschließlich als JSON.",
+            _validation_prompt(context),
+            timeout=180,
+        )
+        issues = result.get("issues", [])
+        if not isinstance(issues, list):
+            issues = []
+        return jsonify({
+            "valid": bool(result.get("valid", not issues)),
+            "summary": str(result.get("summary", "")),
+            "issues": issues,
+            "model": model,
+        })
+    except OpenRouterError as exc:
+        return jsonify({"error": str(exc)}), 502
+    finally:
+        db.disconnect()
+
 @planning_bp.route("/auftraege", methods=["GET"])
 def list_auftraege():
     db = _get_db()
@@ -184,6 +224,7 @@ def create_auftrag():
         return jsonify({"error": "regel_ids muss eine Liste sein"}), 400
 
     run_ai = body.get("run_ai", False)
+    model = (body.get("model") or DEFAULT_MODEL).strip()
 
     db = _get_db()
     try:
@@ -204,7 +245,7 @@ def create_auftrag():
                 )
 
         if run_ai:
-            result = _run_ai_planning(db, auftrag, regel_ids)
+            result = _run_ai_planning(db, auftrag, regel_ids, model)
             return jsonify(result), 201
 
         return jsonify(auftrag), 201
@@ -226,7 +267,8 @@ def run_auftrag(aid: int):
         )
         regel_ids = [r["regel_id"] for r in regel_ids_rows]
 
-        result = _run_ai_planning(db, auftrag, regel_ids)
+        body = request.get_json(silent=True) or {}
+        result = _run_ai_planning(db, auftrag, regel_ids, (body.get("model") or DEFAULT_MODEL).strip())
         return jsonify(result)
     finally:
         db.disconnect()
@@ -277,75 +319,67 @@ def apply_auftrag(aid: int):
         db.disconnect()
 
 
-def _run_ai_planning(db: DatabaseInterface, auftrag: dict, regel_ids: list) -> dict:
-    """Run AI-based planning via Hermes provider abstraction.
-
-    If the AI provider is not configured or unreachable, returns an honest
-    configuration-dependent error with a fallback suggestion mode.
-    """
-    config = _read_config()
-    hermes_url = config.get("hermes_api_url", "")
-    aid = auftrag["id"]
-
-    # Load rules
-    regeln = []
-    for rid in regel_ids:
-        r = db.fetchone("SELECT * FROM planungsregeln WHERE id = ?", (rid,))
-        if r:
-            regeln.append(r)
-
-    # Load existing appointments for the week range
-    termine = db.fetchall(
-        "SELECT tl.*, t.bezeichnung, t.dauer_min FROM terminliste tl JOIN termine t ON tl.meeting = t.bespr_nr WHERE tl.woche BETWEEN ? AND ? ORDER BY tl.woche, tl.tag, tl.start",
-        (auftrag["woche_von"], auftrag["woche_bis"]),
-    )
-
-    if not hermes_url:
-        # No AI provider configured - return honest error with suggestion mode
-        db.execute(
-            "UPDATE planungsauftraege SET status = 'fehler_provider', ergebnis_json = ?, aktualisiert_am = datetime('now') WHERE id = ?",
-            (json.dumps({
-                "error": "KI-Provider nicht konfiguriert",
-                "provider_status": "not_configured",
-                "hinweis": "Bitte hermes_api_url in den Einstellungen konfigurieren, um KI-basierte Planung zu nutzen.",
-                "vorschlaege": [],
-                "konflikte": [],
-                "bestehende_termine": len(termine),
-                "regeln_geladen": len(regeln),
-            }, ensure_ascii=False), aid),
-        )
-        updated = db.fetchone("SELECT * FROM planungsauftraege WHERE id = ?", (aid,))
-        updated["ergebnis"] = json.loads(updated["ergebnis_json"]) if updated.get("ergebnis_json") else None
-        return updated
-
-    # Try calling Hermes AI API
-    import urllib.request
-    import urllib.error
-
-    prompt = _build_planning_prompt(auftrag, regeln, termine)
-
+@planning_bp.route("/auftraege/<int:aid>/excel", methods=["GET"])
+def download_auftrag_excel(aid: int):
+    db = _get_db()
+    path = ""
     try:
-        req_data = json.dumps({"prompt": prompt}).encode("utf-8")
-        req = urllib.request.Request(
-            f"{hermes_url}/api/v1/execute",
-            data=req_data,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            resp_data = json.loads(resp.read().decode("utf-8"))
+        auftrag = db.fetchone("SELECT * FROM planungsauftraege WHERE id = ?", (aid,))
+        if not auftrag or not auftrag.get("ergebnis_json"):
+            return jsonify({"error": "Kein Planungsergebnis vorhanden"}), 404
+        result = json.loads(auftrag["ergebnis_json"])
+        if not result.get("vorschlaege"):
+            return jsonify({"error": "Keine Terminvorschläge vorhanden"}), 409
+        from backend.services.export_service import export_planning_excel
+        handle, path = tempfile.mkstemp(suffix=".xlsx")
+        os.close(handle)
+        export_planning_excel(db, path, result["vorschlaege"], auftrag["woche_von"], auftrag["woche_bis"])
 
-        # Parse AI response into structured proposals
-        ai_result = resp_data.get("result", str(resp_data))
+        @after_this_request
+        def cleanup(response):
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+            return response
+
+        return send_file(
+            path,
+            as_attachment=True,
+            download_name=f"planung_kw_{auftrag['woche_von']}-{auftrag['woche_bis']}.xlsx",
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+    finally:
+        db.disconnect()
+
+
+def _run_ai_planning(db: DatabaseInterface, auftrag: dict, regel_ids: list, model: str) -> dict:
+    """Run structured planning through OpenRouter."""
+    aid = auftrag["id"]
+    context = _planning_context(db, auftrag["woche_von"], auftrag["woche_bis"], regel_ids)
+    try:
+        ai_result = chat_json(
+            model,
+            "Du bist ein professioneller Terminplaner. Erzeuge ausschließlich valides JSON.",
+            _planning_prompt(context),
+            timeout=300,
+        )
+        proposals = ai_result.get("proposals", ai_result.get("vorschlaege", []))
+        conflicts = ai_result.get("issues", ai_result.get("konflikte", []))
+        if not isinstance(proposals, list):
+            proposals = []
+        if not isinstance(conflicts, list):
+            conflicts = []
         ergebnis = {
             "provider_status": "connected",
-            "ai_response": ai_result,
-            "vorschlaege": [],
-            "konflikte": [],
-            "bestehende_termine": len(termine),
-            "regeln_geladen": len(regeln),
+            "model": model,
+            "summary": ai_result.get("summary", ""),
+            "vorschlaege": proposals,
+            "konflikte": conflicts,
+            "bestehende_termine": len(context["existing"]),
+            "regeln_geladen": len(context["rules"]),
+            "excel_ready": bool(proposals),
         }
-
         db.execute(
             "UPDATE planungsauftraege SET status = 'vorschlag', ergebnis_json = ?, aktualisiert_am = datetime('now') WHERE id = ?",
             (json.dumps(ergebnis, ensure_ascii=False), aid),
@@ -354,16 +388,16 @@ def _run_ai_planning(db: DatabaseInterface, auftrag: dict, regel_ids: list) -> d
         updated["ergebnis"] = ergebnis
         return updated
 
-    except Exception as e:
-        logger.warning("AI planning failed: %s", type(e).__name__)
+    except OpenRouterError as exc:
+        logger.warning("AI planning failed: %s", exc)
         error_result = {
-            "error": f"KI-Provider nicht erreichbar ({type(e).__name__})",
+            "error": str(exc),
             "provider_status": "unreachable",
-            "hinweis": "Der KI-Provider konnte nicht erreicht werden. Bitte prüfen Sie die hermes_api_url Konfiguration.",
+            "hinweis": "Bitte OpenRouter-Konfiguration und Modell prüfen.",
             "vorschlaege": [],
             "konflikte": [],
-            "bestehende_termine": len(termine),
-            "regeln_geladen": len(regeln),
+            "bestehende_termine": len(context["existing"]),
+            "regeln_geladen": len(context["rules"]),
         }
         db.execute(
             "UPDATE planungsauftraege SET status = 'fehler_provider', ergebnis_json = ?, aktualisiert_am = datetime('now') WHERE id = ?",
@@ -482,23 +516,59 @@ def delete_abhaengigkeit(aid: int):
         db.disconnect()
 
 
-def _build_planning_prompt(auftrag: dict, regeln: list, termine: list) -> str:
-    """Build a structured prompt for the AI planning provider."""
-    lines = [
-        f"Erstelle einen Terminplan für die Kalenderwochen {auftrag['woche_von']} bis {auftrag['woche_bis']}.",
-        "",
-        "Bestehende Termine:",
-    ]
-    for t in termine[:50]:  # limit context
-        lines.append(f"  KW{t['woche']} {t['tag']} {t['start']}: {t['bezeichnung']} ({t['dauer_min']}min)")
+def _planning_context(db: DatabaseInterface, week_from: int, week_to: int, rule_ids: list) -> dict:
+    rules = []
+    for rule_id in rule_ids:
+        rule = db.fetchone("SELECT * FROM planungsregeln WHERE id = ?", (rule_id,))
+        if rule:
+            rules.append(rule)
+    meetings = db.fetchall(
+        "SELECT bespr_nr, bezeichnung, intervall, dauer_min FROM termine ORDER BY bespr_nr"
+    )
+    for meeting in meetings:
+        meeting["teilnehmer"] = [
+            row["usergruppe"] for row in db.fetchall(
+                "SELECT usergruppe FROM termin_teilnehmer WHERE bespr_nr = ? ORDER BY usergruppe",
+                (meeting["bespr_nr"],),
+            )
+        ]
+    existing = db.fetchall(
+        "SELECT tl.woche, tl.tag, tl.start, tl.meeting AS bespr_nr, "
+        "t.bezeichnung, t.dauer_min FROM terminliste tl "
+        "JOIN termine t ON tl.meeting = t.bespr_nr "
+        "WHERE tl.woche BETWEEN ? AND ? ORDER BY tl.woche, tl.tag, tl.start",
+        (week_from, week_to),
+    )
+    return {
+        "week_from": week_from,
+        "week_to": week_to,
+        "rules": rules,
+        "meetings": meetings,
+        "existing": existing,
+    }
 
-    lines.append("")
-    lines.append("Regeln:")
-    for r in regeln:
-        lines.append(f"  [{r['typ']}] {r['bezeichnung']}: {r['bedingung']} (Prio {r['prioritaet']})")
 
-    lines.append("")
-    lines.append("Bitte erstelle Vorschläge im JSON-Format mit Feldern: typ, woche, tag, start, bespr_nr, bezeichnung, dauer_min")
-    lines.append("Identifiziere auch mögliche Konflikte.")
+def _validation_prompt(context: dict) -> str:
+    return (
+        "Prüfe vor einer Planung, ob Regeln, Meetingdefinitionen, Intervalle, Dauern, "
+        "Teilnehmer und bestehende Vorgaben logisch erfüllbar sind. Melde Widersprüche, "
+        "Unklarheiten, fehlende Angaben und wahrscheinlich nicht erfüllbare Kombinationen. "
+        "Antworte als JSON: {\"valid\": boolean, \"summary\": string, "
+        "\"issues\":[{\"severity\":\"error|warning|info\",\"title\":string,"
+        "\"description\":string,\"related_rules\":[number],\"related_meetings\":[number]}]}.\n\n"
+        f"EINGABEDATEN:\n{json.dumps(context, ensure_ascii=False)}"
+    )
 
-    return "\n".join(lines)
+
+def _planning_prompt(context: dict) -> str:
+    return (
+        "Erstelle für alle übergebenen Meetings einen möglichst vollständigen, konfliktfreien "
+        "Terminplan im Wochenbereich. Halte Regeln nach Priorität ein. Wenn etwas nicht erfüllbar "
+        "oder unklar ist, plane nicht stillschweigend darüber hinweg, sondern melde es als Issue. "
+        "Wochentage müssen Mon, Tue, Wed, Thu oder Fri sein; Startzeiten HH:MM. "
+        "Antworte als JSON: {\"summary\":string,\"proposals\":[{\"woche\":number,"
+        "\"tag\":\"Mon|Tue|Wed|Thu|Fri\",\"start\":\"HH:MM\",\"bespr_nr\":number}],"
+        "\"issues\":[{\"severity\":\"error|warning|info\",\"title\":string,"
+        "\"description\":string,\"related_rules\":[number],\"related_meetings\":[number]}]}.\n\n"
+        f"EINGABEDATEN:\n{json.dumps(context, ensure_ascii=False)}"
+    )

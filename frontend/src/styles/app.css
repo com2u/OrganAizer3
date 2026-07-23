@@ -1629,6 +1629,69 @@ button { font-family: inherit; }
 
 .tts-result audio { width: 100%; margin-bottom: 8px; }
 
+.audio-level {
+  width: 100%;
+  height: 8px;
+  margin: 0 0 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+}
+
+.audio-level span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--success), var(--accent));
+  transition: width 80ms linear;
+}
+
+.recording-level {
+  width: min(220px, 100%);
+  margin: 0;
+}
+
+/* Planning AI */
+.planning-model-picker { display: grid; gap: 8px; margin: 18px 0; }
+.model-search { display: flex; align-items: center; gap: 8px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-base); }
+.model-search input { flex: 1; border: 0; background: transparent; }
+.planning-rules { margin: 18px 0; border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
+.planning-rules-summary { width: 100%; display: flex; align-items: center; gap: 10px; padding: 13px 15px; border: 0; background: var(--bg-surface); color: var(--text-primary); cursor: pointer; text-align: left; }
+.planning-rules-summary svg { transition: transform .15s; }
+.planning-rules-summary svg.expanded { transform: rotate(180deg); }
+.planning-rules-summary span { display: grid; gap: 2px; }
+.planning-rules-summary small { color: var(--text-secondary); }
+.planning-rule-details { max-height: 440px; overflow: auto; padding: 10px 14px 14px; border-top: 1px solid var(--border); }
+.planning-rule-details .checkbox-item span { display: grid; gap: 3px; }
+.planning-rule-details .select-all { padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.planning-issues-modal { width: min(680px, 100%); max-height: 84vh; overflow: auto; }
+.planning-issue-list { display: grid; gap: 10px; margin: 16px 0; }
+.planning-issue { padding: 12px; border-left: 4px solid var(--info); background: var(--bg-base); border-radius: var(--radius-sm); }
+.planning-issue p { margin: 5px 0; }
+.planning-issue.issue-error { border-color: var(--error); }
+.planning-issue.issue-warning { border-color: var(--warning); }
+.planning-issue.issue-info { border-color: var(--info); }
+
+/* System monitor */
+.system-content { display: grid; gap: 18px; }
+.system-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.system-metric { display: grid; gap: 6px; }
+.system-metric > svg { color: var(--accent); }
+.system-metric strong { font-size: 24px; }
+.system-bar { height: 7px; overflow: hidden; border-radius: 99px; background: var(--bg-base); }
+.system-bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--success), var(--accent)); }
+.system-content .card h3 { display: flex; align-items: center; gap: 8px; }
+.system-container-list { display: grid; margin-top: 12px; }
+.system-container-list article { display: grid; grid-template-columns: 12px 1fr auto; align-items: center; gap: 12px; padding: 11px 0; border-top: 1px solid var(--border); }
+.system-container-list article > div { display: grid; gap: 3px; }
+.system-container-list small { color: var(--text-secondary); }
+.container-state { width: 10px; height: 10px; border-radius: 50%; background: var(--text-tertiary); }
+.container-state.state-running { background: var(--success); box-shadow: 0 0 8px color-mix(in srgb, var(--success), transparent 40%); }
+.container-state.state-exited, .container-state.state-dead { background: var(--error); }
+.container-status { text-align: right; }
+@media (max-width: 760px) { .system-metrics { grid-template-columns: 1fr; } }
+
 .download-link {
   display: inline-flex;
   align-items: center;

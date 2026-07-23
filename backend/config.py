@@ -74,6 +74,11 @@ HERMES_API_URL = os.environ.get(
 HERMES_API_KEY = os.environ.get("HERMES_API_KEY", "")
 HERMES_MODEL = os.environ.get("HERMES_MODEL", "hermes-agent")
 
+# OpenRouter powers rule validation and AI scheduling.
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
+OPENROUTER_API_URL = os.environ.get("OPENROUTER_API_URL", "https://openrouter.ai/api/v1")
+OPENROUTER_MODEL = os.environ.get("OPENROUTER_MODEL", "openai/gpt-4.1-mini")
+
 # ── Telephony / voice stack ────────────────────────────────────────────────────
 # Protected env file holding all telephony settings + secrets. Lives in the
 # persisted, git-ignored, upload-excluded data/ directory and is shared with the

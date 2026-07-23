@@ -4,7 +4,10 @@ import hashlib
 import json
 import logging
 import os
+import socket
 import tempfile
+import time
+import http.client
 
 from flask import Blueprint, g, jsonify, request, send_file
 
@@ -57,6 +60,68 @@ def get_db() -> DatabaseInterface:
     db = get_database()
     db.connect()
     return db
+
+
+class _UnixHTTPConnection(http.client.HTTPConnection):
+    def __init__(self, socket_path: str):
+        super().__init__("localhost")
+        self.socket_path = socket_path
+
+    def connect(self):
+        self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.sock.connect(self.socket_path)
+
+
+def _cpu_sample() -> tuple[int, int]:
+    with open("/proc/stat", encoding="utf-8") as handle:
+        values = [int(value) for value in handle.readline().split()[1:]]
+    idle = values[3] + (values[4] if len(values) > 4 else 0)
+    return sum(values), idle
+
+
+@api_bp.route("/system/status", methods=["GET"])
+def system_status():
+    total_a, idle_a = _cpu_sample()
+    time.sleep(0.1)
+    total_b, idle_b = _cpu_sample()
+    delta = max(1, total_b - total_a)
+    cpu_percent = round(100 * (1 - (idle_b - idle_a) / delta), 1)
+    memory = {}
+    with open("/proc/meminfo", encoding="utf-8") as handle:
+        for line in handle:
+            key, value = line.split(":", 1)
+            memory[key] = int(value.strip().split()[0]) * 1024
+    total_memory = memory.get("MemTotal", 0)
+    available_memory = memory.get("MemAvailable", 0)
+    containers = []
+    docker_error = None
+    try:
+        connection = _UnixHTTPConnection("/var/run/docker.sock")
+        connection.request("GET", "/containers/json?all=1")
+        response = connection.getresponse()
+        payload = json.loads(response.read().decode("utf-8"))
+        if response.status != 200:
+            raise RuntimeError(f"Docker API HTTP {response.status}")
+        for container in payload:
+            containers.append({
+                "id": container.get("Id", "")[:12],
+                "name": (container.get("Names") or [""])[0].lstrip("/"),
+                "image": container.get("Image", ""),
+                "state": container.get("State", "unknown"),
+                "status": container.get("Status", ""),
+            })
+        connection.close()
+    except Exception as exc:
+        docker_error = f"{type(exc).__name__}: Docker-Status nicht verfügbar"
+    return jsonify({
+        "cpu_percent": cpu_percent,
+        "memory_total": total_memory,
+        "memory_used": max(0, total_memory - available_memory),
+        "memory_percent": round(100 * (total_memory - available_memory) / total_memory, 1) if total_memory else 0,
+        "containers": sorted(containers, key=lambda item: item["name"]),
+        "docker_error": docker_error,
+        "timestamp": int(time.time()),
+    })
 
 
 def _add_minutes(time_str: str, minutes: int) -> str:
@@ -284,6 +349,10 @@ def get_intervalle():
 @api_bp.route("/import", methods=["POST"])
 def import_data():
     """Upload an Excel file and import it into the database."""
+    if request.form.get("confirm_overwrite", "").lower() != "true":
+        return jsonify({
+            "error": "Explizite Bestätigung erforderlich: Der Import löscht und überschreibt alle bestehenden Daten."
+        }), 400
     if "file" not in request.files:
         return jsonify({"error": "No file provided"}), 400
 

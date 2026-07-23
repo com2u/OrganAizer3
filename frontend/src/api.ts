@@ -1,4 +1,4 @@
-import { Appointment, TerminDetail, Bereich, Usergruppe, Intervall, User, TelephonyConfig, TelephonyStatus, WebToken, Call, CallDetail, PhonebookContact, VoiceResponse, TTSResponse, STTResponse, YouTubeResponse, OCRResponse, HermesExecuteResponse, Person, Rolle, Raum, Komponente, Gruppe, GruppenMitglied, TerminDef, Planungsregel, Planungsauftrag, Abhaengigkeit } from './types'
+import { Appointment, TerminDetail, Bereich, Usergruppe, Intervall, User, TelephonyConfig, TelephonyStatus, WebToken, Call, CallDetail, PhonebookContact, VoiceResponse, TTSResponse, STTResponse, YouTubeResponse, OCRResponse, HermesExecuteResponse, Person, Rolle, Raum, Komponente, Gruppe, GruppenMitglied, TerminDef, Planungsregel, Planungsauftrag, Abhaengigkeit, OpenRouterModel, PlanningIssue, SystemStatus } from './types'
 import { logApi } from './logging'
 
 // Configurable at build time via VITE_API_BASE.
@@ -127,6 +127,7 @@ export async function fetchIntervalle(): Promise<Intervall[]> {
 export async function importExcel(file: File): Promise<void> {
   const formData = new FormData()
   formData.append('file', file)
+  formData.append('confirm_overwrite', 'true')
   const res = await apiFetch('/import', {
     method: 'POST',
     body: formData,
@@ -269,6 +270,17 @@ export async function generateTTS(text: string, voice: string, speed: string): P
   return data
 }
 
+/** Load a protected TTS audio file with the current session credentials. */
+export async function fetchTTSAudio(path: string): Promise<Blob> {
+  const cleanPath = path.replace(/^\/api/, '')
+  const res = await apiFetch(cleanPath)
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.error || 'Audiodatei konnte nicht geladen werden / Audio could not be loaded')
+  }
+  return res.blob()
+}
+
 export async function transcribeAudio(file: File, language = 'de'): Promise<STTResponse> {
   const formData = new FormData()
   formData.append('audio', file)
@@ -402,17 +414,53 @@ export async function fetchPlanungsauftraege(): Promise<Planungsauftrag[]> {
   return data
 }
 
-export async function createPlanungsauftrag(body: { bezeichnung?: string; woche_von: number; woche_bis: number; regel_ids?: number[]; run_ai?: boolean }): Promise<Planungsauftrag> {
+export async function createPlanungsauftrag(body: { bezeichnung?: string; woche_von: number; woche_bis: number; regel_ids?: number[]; run_ai?: boolean; model?: string }): Promise<Planungsauftrag> {
   const res = await apiFetch('/planning/auftraege', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || 'Failed to create planning job')
   return data
 }
 
-export async function runPlanungsauftrag(id: number): Promise<Planungsauftrag> {
-  const res = await apiFetch(`/planning/auftraege/${id}/run`, { method: 'POST' })
+export async function runPlanungsauftrag(id: number, model?: string): Promise<Planungsauftrag> {
+  const res = await apiFetch(`/planning/auftraege/${id}/run`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model }) })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || 'Failed to run planning')
+  return data
+}
+
+export async function fetchOpenRouterModels(): Promise<{ models: OpenRouterModel[]; default: string }> {
+  const res = await apiFetch('/planning/models')
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || 'OpenRouter models could not be loaded')
+  return data
+}
+
+export async function validatePlanning(body: { woche_von: number; woche_bis: number; regel_ids: number[]; model: string }): Promise<{ valid: boolean; summary: string; issues: PlanningIssue[]; model: string }> {
+  const res = await apiFetch('/planning/validate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || 'Validation failed')
+  return data
+}
+
+export async function downloadPlanningExcel(id: number): Promise<void> {
+  const res = await apiFetch(`/planning/auftraege/${id}/excel`)
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.error || 'Planning Excel download failed')
+  }
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = `planung-${id}.xlsx`
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
+export async function fetchSystemStatus(): Promise<SystemStatus> {
+  const res = await apiFetch('/system/status')
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || 'System status unavailable')
   return data
 }
 
