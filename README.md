@@ -8,7 +8,7 @@
 
 ---
 
-## Version: 0.1.11 (July 2026)
+## Version: 0.1.12 (July 2026)
 
 ## Feature Overview
 
@@ -23,7 +23,7 @@
 - **YouTube Download**: URL input, format selection (MP3/MP4), yt-dlp with Deno JS runtime.
 - **Bilder erstellen**: Prompt, Negativprompt, 8 Stile, 5 Seitenverhältnisse, 1-4 Bilder, 3 Qualitätsstufen. Backend: FAL.ai → Hermes API → Pollinations.ai fallback (always works, no API key needed).
 - **OCR-Texterkennung**: 3 Input-Modi (Datei, URL, Zwischenablage), 5 Sprachen, Tesseract OCR. URL mode downloads image server-side.
-- **Internetrecherche**: Thema → Tiefe → Hermes API → Markdown summary, downloadable.
+- **Internetrecherche**: Thema → Tiefe → asynchroner Hermes-Auftrag mit Laufzeit/Status → Markdown-Zusammenfassung, herunterladbar.
 - **Templates**: 4 Vorlagen (Neue Aufgabe, Wiederkehrende, Review, Workflow).
 - **Cancel**: AbortController für alle Tasks.
 - **Ausführungs-Historie**: Per-User SQLite task_history.
@@ -47,6 +47,7 @@
 
 ### Planung und System
 - OpenRouter-based rule validation and scheduling with searchable model selection.
+- Lange Planungen laufen als Hintergrundauftrag; Laufzeit, Verarbeitungsphase und verfügbare Zwischenschritte werden in der Oberfläche angezeigt.
 - All active rules are selected by default; individual rules are available in a collapsed detail panel.
 - Planning results are downloadable as import-compatible Excel workbooks before any data is replaced.
 - Excel imports require explicit confirmation in both frontend and backend because they overwrite schedule data.

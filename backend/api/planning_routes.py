@@ -379,7 +379,36 @@ def download_auftrag_excel(aid: int):
 def _run_ai_planning(db: DatabaseInterface, auftrag: dict, regel_ids: list, model: str) -> dict:
     """Run structured planning through OpenRouter."""
     aid = auftrag["id"]
+    progress = {
+        "provider_status": "running",
+        "model": model,
+        "phase": "Planungsdaten und ausgewählte Regeln werden vorbereitet.",
+        "progress_messages": [
+            "Planungsauftrag angelegt",
+            "Regeln und bestehende Termine werden geladen",
+        ],
+        "vorschlaege": [],
+        "konflikte": [],
+    }
+    db.execute(
+        "UPDATE planungsauftraege SET ergebnis_json = ?, aktualisiert_am = datetime('now') WHERE id = ?",
+        (json.dumps(progress, ensure_ascii=False), aid),
+    )
     context = _planning_context(db, auftrag["woche_von"], auftrag["woche_bis"], regel_ids)
+    progress.update({
+        "phase": f"OpenRouter verarbeitet die Planung mit {model}.",
+        "progress_messages": [
+            "Planungsauftrag angelegt",
+            f"{len(context['rules'])} Regeln und {len(context['existing'])} bestehende Termine geladen",
+            "Anfrage an das gewählte KI-Modell übergeben",
+        ],
+        "bestehende_termine": len(context["existing"]),
+        "regeln_geladen": len(context["rules"]),
+    })
+    db.execute(
+        "UPDATE planungsauftraege SET ergebnis_json = ?, aktualisiert_am = datetime('now') WHERE id = ?",
+        (json.dumps(progress, ensure_ascii=False), aid),
+    )
     try:
         ai_result = chat_json(
             model,

@@ -83,7 +83,7 @@ const TOOL_CARDS: { key: ToolKey; icon: typeof CheckSquare; titleKey: string; de
 ]
 
 export default function AufgabenView() {
-  const { t } = useTheme()
+  const { t, theme } = useTheme()
   const [activeTab, setActiveTab] = useState<'overview' | 'executed'>('overview')
   const [selectedTool, setSelectedTool] = useState<ToolKey>('overview')
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null)
@@ -119,6 +119,9 @@ export default function AufgabenView() {
   const [rechercheDepth, setRechercheDepth] = useState<'kurz' | 'ausführlich'>('ausführlich')
   const [rechercheLoading, setRechercheLoading] = useState(false)
   const [rechercheResult, setRechercheResult] = useState<string | null>(null)
+  const [rechercheError, setRechercheError] = useState<string | null>(null)
+  const [recherchePhase, setRecherchePhase] = useState('')
+  const [rechercheElapsed, setRechercheElapsed] = useState(0)
 
   const selectTool = (tool: ToolKey) => { setSelectedTool(tool); setSelectedTemplate(null); setFormData({}) }
 
@@ -330,12 +333,20 @@ export default function AufgabenView() {
     rechercheAbortRef.current = new AbortController()
     setRechercheLoading(true)
     setRechercheResult(null)
+    setRechercheError(null)
+    setRecherchePhase('Rechercheauftrag wird an Hermes übergeben…')
+    setRechercheElapsed(0)
+    const startedAt = Date.now()
+    const elapsedTimer = window.setInterval(
+      () => setRechercheElapsed(Math.floor((Date.now() - startedAt) / 1000)),
+      1000,
+    )
     const depthHint = rechercheDepth === 'kurz'
       ? 'Erstelle eine kurze Zusammenfassung (max. 300 Wörter).'
       : 'Erstelle eine ausführliche, strukturierte Zusammenfassung mit Unterabschnitten.'
     const prompt = `Recherchiere im Internet zum Thema: ${rechercheQuery}. ${depthHint}`
     try {
-      const res = await fetch(apiUrl('/api/hermes/execute'), {
+      const res = await fetch(apiUrl('/api/hermes/jobs'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -346,13 +357,26 @@ export default function AufgabenView() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Recherche failed')
-      const resultText = data.result || data.response || data.text || JSON.stringify(data)
-      setRechercheResult(resultText)
+      let job = data
+      while (job.status === 'queued' || job.status === 'running') {
+        setRecherchePhase(job.phase || 'Hermes recherchiert…')
+        await new Promise(resolve => window.setTimeout(resolve, 2000))
+        const statusRes = await fetch(apiUrl(`/api/hermes/jobs/${job.id}`), {
+          headers: { ...authHeader() },
+          signal: rechercheAbortRef.current.signal,
+        })
+        job = await statusRes.json()
+        if (!statusRes.ok) throw new Error(job.error || 'Recherche-Status konnte nicht geladen werden')
+      }
+      if (job.status === 'failed') throw new Error(job.error || 'Recherche fehlgeschlagen')
+      setRecherchePhase(job.phase || 'Recherche abgeschlossen.')
+      setRechercheResult(job.result || '')
       await saveTaskHistory(`Recherche: ${rechercheQuery}`, t('aufgaben.success'))
     } catch (error: unknown) {
       if (error instanceof Error && error.name === 'AbortError') return
-      setRechercheResult(`**Fehler:** ${error instanceof Error ? error.message : String(error)}`)
+      setRechercheError(error instanceof Error ? error.message : String(error))
     } finally {
+      window.clearInterval(elapsedTimer)
       setRechercheLoading(false)
       rechercheAbortRef.current = null
     }
@@ -397,6 +421,16 @@ export default function AufgabenView() {
             </button>
           )}
         </div>
+        {rechercheLoading && (
+          <div className="recherche-progress" role="status" aria-live="polite">
+            <Loader2 size={18} className="spin" />
+            <div>
+              <strong>{recherchePhase}</strong>
+              <small>Laufzeit: {Math.floor(rechercheElapsed / 60)}:{String(rechercheElapsed % 60).padStart(2, '0')} min</small>
+            </div>
+          </div>
+        )}
+        {rechercheError && <div className="alert alert-error">{rechercheError}</div>}
         {rechercheResult && (
           <div className="recherche-result">
             <div className="result-header">
@@ -407,7 +441,7 @@ export default function AufgabenView() {
                 </button>
               </div>
             </div>
-            <div data-color-mode="auto" className="recherche-markdown">
+            <div data-color-mode={theme} className="recherche-markdown">
               <MDEditor.Markdown source={rechercheResult} />
             </div>
           </div>

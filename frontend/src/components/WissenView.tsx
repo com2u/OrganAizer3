@@ -22,7 +22,7 @@ interface EditorProps {
 }
 
 function NoteEditor({ path }: EditorProps) {
-  const { t } = useTheme()
+  const { t, theme } = useTheme()
   const [content, setContent] = useState('')
   const [original, setOriginal] = useState('')
   const [mtime, setMtime] = useState<number | undefined>()
@@ -127,7 +127,7 @@ function NoteEditor({ path }: EditorProps) {
           <button className="secondary-btn" onClick={loadNote}>{t('wissen.conflictReload')}</button>
         </div>
       )}
-      <div className="note-md-editor" data-color-mode="auto">
+      <div className="note-md-editor" data-color-mode={theme}>
         <MDEditor
           value={content}
           onChange={(val) => setContent(val || '')}

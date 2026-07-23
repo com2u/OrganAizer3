@@ -42,6 +42,42 @@ test.describe('Aufgaben - Internet Recherche', () => {
     await expect(searchBtn).toBeEnabled()
   })
 
+  test('long research is polled and renders the final markdown result', async () => {
+    let polls = 0
+    await sharedPage.route('**/api/hermes/jobs', route => route.fulfill({
+      status: 202,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 'research-1',
+        status: 'queued',
+        phase: 'Rechercheauftrag wurde an Hermes übergeben.',
+      }),
+    }))
+    await sharedPage.route('**/api/hermes/jobs/research-1', route => {
+      polls += 1
+      return route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify(polls === 1 ? {
+          id: 'research-1',
+          status: 'running',
+          phase: 'Hermes recherchiert im Internet und wertet Quellen aus.',
+        } : {
+          id: 'research-1',
+          status: 'completed',
+          phase: 'Recherche abgeschlossen.',
+          result: '# Geprüftes Ergebnis\n\nDie Recherche wurde erfolgreich abgeschlossen.',
+        }),
+      })
+    })
+
+    await sharedPage.locator('input[type="text"]').first().fill('Testthema')
+    await sharedPage.getByRole('button', { name: /Recherchieren/ }).click()
+    await expect(sharedPage.getByRole('status')).toContainText(/Hermes|Rechercheauftrag/)
+    await expect(sharedPage.locator('.recherche-markdown')).toContainText('Geprüftes Ergebnis', { timeout: 10_000 })
+    await expect(sharedPage.locator('.alert-error')).toHaveCount(0)
+    expect(polls).toBeGreaterThanOrEqual(2)
+  })
+
   test('depth selector has kurz and ausführlich options', async () => {
     const depthSelect = sharedPage.locator('select').filter({ hasText: /Kurz|Ausführlich|ausführlich/ })
     await expect(depthSelect).toBeVisible()

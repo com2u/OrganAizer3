@@ -264,6 +264,8 @@ export interface PlanungsErgebnis {
   model?: string
   summary?: string
   excel_ready?: boolean
+  phase?: string
+  progress_messages?: string[]
 }
 
 export interface PlanningIssue {

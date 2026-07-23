@@ -108,6 +108,7 @@ test('lange Planung wird per Statusabfrage ohne Request-Timeout abgeschlossen', 
   await page.getByRole('button', { name: /KI-Planung starten/ }).click()
 
   await expect(page.getByRole('button', { name: /Planung läuft/ })).toBeVisible()
+  await expect(page.locator('.planning-progress')).toContainText(/Laufzeit:/)
   await expect(page.getByRole('button', { name: /Excel-Vorschlag herunterladen/ })).toBeVisible({ timeout: 10_000 })
   expect(polls).toBeGreaterThanOrEqual(2)
 })

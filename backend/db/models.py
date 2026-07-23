@@ -169,6 +169,17 @@ CREATE_TABLES = [
         PRIMARY KEY (auftrag_id, regel_id)
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS hermes_jobs (
+        id TEXT PRIMARY KEY,
+        status TEXT NOT NULL,
+        phase TEXT NOT NULL,
+        result TEXT,
+        error TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """,
     # ===== AI Connections table =====
     """
     CREATE TABLE IF NOT EXISTS ki_verbindungen (
@@ -249,6 +260,7 @@ CREATE_TABLES = [
 
 # Tables in reverse dependency order for safe deletion
 CLEAR_ORDER = [
+    "hermes_jobs",
     "n8n_config",
     "zugangsanfragen",
     "verbindungen",

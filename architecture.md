@@ -159,7 +159,7 @@ OrganAizer3/
 │   │   │   ├── FilterPanel.tsx      # Filters visible schedule entries.
 │   │   │   ├── AppointmentDetail.tsx # Displays details for a selected appointment.
 │   │   │   ├── RessourcenView.tsx   # Manages people, roles, rooms, components, groups, and meeting resources.
-│   │   │   ├── PlanungView.tsx      # Manages rules and AI-supported planning jobs.
+│   │   │   ├── PlanungView.tsx      # Manages rules and asynchronous AI planning jobs with progress polling.
 │   │   │   ├── SystemView.tsx       # Monitors backend CPU, RAM, and Docker container states.
 │   │   │   ├── TelefonieView.tsx    # Manages SIP settings, phonebook, calls, and the web telephone assistant.
 │   │   │   ├── DialogView.tsx       # Provides the browser voice-dialog experience.

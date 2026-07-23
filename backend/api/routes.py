@@ -6,8 +6,10 @@ import logging
 import os
 import socket
 import tempfile
+import threading
 import time
 import http.client
+import uuid
 
 from flask import Blueprint, g, jsonify, request, send_file
 
@@ -1178,6 +1180,96 @@ def hermes_execute():
         }), 502
 
     return jsonify({"result": content})
+
+
+def _ensure_hermes_jobs_table(db: DatabaseInterface) -> None:
+    if getattr(db, "schema_managed_externally", False):
+        return
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS hermes_jobs (
+            id TEXT PRIMARY KEY,
+            status TEXT NOT NULL,
+            phase TEXT NOT NULL,
+            result TEXT,
+            error TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+
+def _run_hermes_job(job_id: str, prompt: str) -> None:
+    """Run a long Hermes task without keeping the browser request open."""
+    db = get_db()
+    try:
+        _ensure_hermes_jobs_table(db)
+        db.execute(
+            "UPDATE hermes_jobs SET status = ?, phase = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            ("running", "Hermes recherchiert im Internet und wertet Quellen aus.", job_id),
+        )
+        content = _hermes_chat(prompt, timeout=300)
+        db.execute(
+            "UPDATE hermes_jobs SET status = ?, phase = ?, result = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            ("completed", "Recherche abgeschlossen.", content, job_id),
+        )
+    except _HermesNotConfigured:
+        db.execute(
+            "UPDATE hermes_jobs SET status = ?, phase = ?, error = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            ("failed", "Recherche abgebrochen.", "Hermes API ist nicht konfiguriert.", job_id),
+        )
+    except Exception as exc:
+        logger.warning("Hermes background job failed: %s", type(exc).__name__)
+        db.execute(
+            "UPDATE hermes_jobs SET status = ?, phase = ?, error = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            ("failed", "Recherche abgebrochen.", f"Hermes API nicht erreichbar ({type(exc).__name__}).", job_id),
+        )
+    finally:
+        db.disconnect()
+
+
+@api_bp.route("/hermes/jobs", methods=["POST"])
+def create_hermes_job():
+    """Start a potentially long Hermes task and return immediately."""
+    body = request.get_json(silent=True) or {}
+    prompt = (body.get("prompt") or "").strip()
+    if not prompt:
+        return jsonify({"error": "Prompt ist erforderlich / Prompt is required"}), 400
+    if len(prompt) > 50000:
+        return jsonify({"error": "Prompt zu lang (max 50.000 Zeichen) / Prompt too long"}), 400
+    if not _resolve_hermes_url():
+        return jsonify({"error": "Hermes API ist nicht konfiguriert."}), 409
+
+    job_id = uuid.uuid4().hex
+    db = get_db()
+    try:
+        _ensure_hermes_jobs_table(db)
+        db.execute(
+            "INSERT INTO hermes_jobs (id, status, phase) VALUES (?, ?, ?)",
+            (job_id, "queued", "Rechercheauftrag wurde an Hermes übergeben."),
+        )
+        job = db.fetchone("SELECT * FROM hermes_jobs WHERE id = ?", (job_id,))
+    finally:
+        db.disconnect()
+    threading.Thread(
+        target=_run_hermes_job,
+        args=(job_id, prompt),
+        name=f"hermes-job-{job_id[:8]}",
+        daemon=True,
+    ).start()
+    return jsonify(job), 202
+
+
+@api_bp.route("/hermes/jobs/<job_id>", methods=["GET"])
+def get_hermes_job(job_id: str):
+    db = get_db()
+    try:
+        _ensure_hermes_jobs_table(db)
+        job = db.fetchone("SELECT * FROM hermes_jobs WHERE id = ?", (job_id,))
+        if not job:
+            return jsonify({"error": "Rechercheauftrag nicht gefunden."}), 404
+        return jsonify(job)
+    finally:
+        db.disconnect()
 
 
 @api_bp.route("/hermes/improve-prompt", methods=["POST"])

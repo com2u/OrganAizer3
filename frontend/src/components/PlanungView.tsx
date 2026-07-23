@@ -162,6 +162,18 @@ function PlanenTab() {
   const [issueTitle, setIssueTitle] = useState('')
   const [result, setResult] = useState<Planungsauftrag | null>(null)
   const [error, setError] = useState('')
+  const [elapsedSeconds, setElapsedSeconds] = useState(0)
+
+  useEffect(() => {
+    if (!running) return
+    const startedAt = Date.now()
+    setElapsedSeconds(0)
+    const timer = window.setInterval(
+      () => setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000)),
+      1000,
+    )
+    return () => window.clearInterval(timer)
+  }, [running])
 
   useEffect(() => {
     fetchPlanungsregeln().then(r => {
@@ -311,6 +323,18 @@ function PlanenTab() {
       {result && (
         <div className="card">
           <h3>{t('plan.status')}: <span className={`badge badge-${result.status}`}>{result.status}</span></h3>
+          {result.status === 'laeuft' && (
+            <div className="planning-progress" role="status" aria-live="polite">
+              <Loader2 size={20} className="spin" />
+              <div>
+                <strong>{result.ergebnis?.phase || 'Planungsauftrag wird vorbereitet…'}</strong>
+                <small>Laufzeit: {Math.floor(elapsedSeconds / 60)}:{String(elapsedSeconds % 60).padStart(2, '0')} min</small>
+                {result.ergebnis?.progress_messages?.length ? (
+                  <ol>{result.ergebnis.progress_messages.map((message, index) => <li key={index}>{message}</li>)}</ol>
+                ) : null}
+              </div>
+            </div>
+          )}
           {result.ergebnis && (
             <div>
               {result.ergebnis.error && (

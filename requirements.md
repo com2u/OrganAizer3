@@ -35,10 +35,11 @@ Describe the current architecture in a implementation.md
 
 1. All active planning rules are selected by default; detailed rules remain collapsed until requested and can then be deselected individually.
 2. Validation and planning use OpenRouter with a searchable choice of available text models.
-3. Validation checks rules, meetings, intervals, durations, participants, and fixed appointments for contradictions and reports findings in a modal dialog.
-4. Planning returns structured appointment proposals and reports unresolved conflicts or ambiguities instead of silently ignoring them.
-5. A planning result is downloadable as an Excel workbook compatible with the schedule import/export format.
-6. Excel imports overwrite existing database content only after an explicit frontend warning and a mandatory backend confirmation flag.
+3. Long planning and Hermes research requests must run asynchronously and expose elapsed time plus available processing phases in the UI.
+4. Validation checks rules, meetings, intervals, durations, participants, and fixed appointments for contradictions and reports findings in a modal dialog.
+5. Planning returns structured appointment proposals and reports unresolved conflicts or ambiguities instead of silently ignoring them.
+6. A planning result is downloadable as an Excel workbook compatible with the schedule import/export format.
+7. Excel imports overwrite existing database content only after an explicit frontend warning and a mandatory backend confirmation flag.
 
 ## System Monitoring
 

@@ -1672,6 +1672,23 @@ button { font-family: inherit; }
 .planning-issue.issue-error { border-color: var(--error); }
 .planning-issue.issue-warning { border-color: var(--warning); }
 .planning-issue.issue-info { border-color: var(--info); }
+.planning-progress,
+.recherche-progress {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+.planning-progress > div,
+.recherche-progress > div { display: grid; gap: 5px; }
+.planning-progress small,
+.recherche-progress small { color: var(--text-secondary); }
+.planning-progress ol { margin: 4px 0 0; padding-left: 20px; color: var(--text-secondary); }
 
 /* System monitor */
 .system-content { display: grid; gap: 18px; }
@@ -4404,6 +4421,12 @@ button { font-family: inherit; }
   color: var(--text-primary);
 }
 
+.note-md-editor .wmde-markdown,
+.recherche-markdown .wmde-markdown {
+  background-color: var(--bg-base) !important;
+  color: var(--text-primary) !important;
+}
+
 .note-md-editor .w-md-editor-content {
   background: var(--bg-base) !important;
 }
@@ -4905,6 +4928,10 @@ button { font-family: inherit; }
   border-radius: 6px;
   font-size: 0.9rem;
   line-height: 1.6;
+}
+
+.recherche-markdown .wmde-markdown {
+  padding: 8px;
 }
 
 .hero-mark-btn {
