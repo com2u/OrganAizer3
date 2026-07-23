@@ -15,7 +15,7 @@ import json
 import re
 import shutil
 import threading
-from datetime import date
+from datetime import datetime
 from pathlib import Path
 from typing import Optional, TypedDict
 
@@ -109,14 +109,52 @@ class Phonebook:
         with self._lock:
             for contact in self._contacts:
                 if normalize_number(contact.get("number", "")) == target:
+                    timestamp = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M")
                     contact.setdefault("notes", []).append(
-                        f"{date.today().isoformat()}: {note}"
+                        f"{timestamp}: {note}"
                     )
                     self._save()
                     logger.info("Added note to %s: %s", contact.get("name"), note)
                     return True
         logger.warning("Cannot add note: no contact for number %s.", number)
         return False
+
+    def record_call(
+        self,
+        number: str,
+        summary: str,
+        ended_at: Optional[datetime] = None,
+    ) -> bool:
+        """Append a call note, creating a contact for an unknown number."""
+        target = normalize_number(number)
+        if not target:
+            logger.warning("Cannot record call: invalid or empty number %s.", number)
+            return False
+
+        timestamp = ended_at or datetime.now().astimezone()
+        concise_summary = (summary or "").strip() or "Keine Gesprächsinhalte erfasst."
+        note = (
+            f"Letzter Anruf am {timestamp.strftime('%d.%m.%Y')} um "
+            f"{timestamp.strftime('%H:%M')} Uhr: {concise_summary}"
+        )
+
+        with self._lock:
+            contact = next(
+                (
+                    item
+                    for item in self._contacts
+                    if normalize_number(item.get("number", "")) == target
+                ),
+                None,
+            )
+            if contact is None:
+                contact = {"number": target, "name": "", "notes": []}
+                self._contacts.append(contact)
+                logger.info("Created phonebook entry for caller %s.", target)
+            contact.setdefault("notes", []).append(note)
+            self._save()
+            logger.info("Recorded completed call for %s.", target)
+            return True
 
 
 def format_notes(contact: Contact) -> str:

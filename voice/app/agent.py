@@ -14,6 +14,7 @@ Run with:  python -m app.agent dev   (or  console / start)
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from typing import Optional
 
 from livekit import api
@@ -75,6 +76,26 @@ async def entrypoint(ctx: JobContext) -> None:
 
     call_id: Optional[int] = None
     transcript: list[str] = []
+    call_started_at = datetime.now().astimezone()
+    number: Optional[str] = None
+    finalized = False
+
+    async def _finalize(fallback_summary: str = "") -> None:
+        """On hang-up: summarise and persist the call exactly once."""
+        nonlocal finalized
+        if finalized or call_id is None:
+            return
+        finalized = True
+
+        summary = (
+            await summarize_conversation("\n".join(transcript), config)
+        ) or fallback_summary
+        if summary:
+            call_log.add_dialog(call_id, "system", summary, status="summary")
+        call_log.end_call(call_id, summary=summary or None)
+        if number:
+            phonebook.record_call(number, summary)
+        logger.info("Call %s finalised (%d turns).", call_id, len(transcript))
 
     try:
         await ctx.connect()
@@ -116,14 +137,6 @@ async def entrypoint(ctx: JobContext) -> None:
 
         session.on("conversation_item_added", _on_item)
 
-        async def _finalize() -> None:
-            """On hang-up: summarise the call into the Gesprächsnotizbuch."""
-            summary = await summarize_conversation("\n".join(transcript), config)
-            if summary:
-                call_log.add_dialog(call_id, "system", summary, status="summary")
-            call_log.end_call(call_id, summary=summary or None)
-            logger.info("Call %s finalised (%d turns).", call_id, len(transcript))
-
         ctx.add_shutdown_callback(_finalize)
 
         await session.start(
@@ -133,6 +146,7 @@ async def entrypoint(ctx: JobContext) -> None:
                 contact=contact,
                 caller_number=number,
                 knowledge=knowledge,
+                call_started_at=call_started_at,
             ),
             room=ctx.room,
         )
@@ -147,7 +161,7 @@ async def entrypoint(ctx: JobContext) -> None:
         # call down cleanly instead of crashing the whole application.
         logger.exception("Realtime session failed; terminating call cleanly.")
         if call_id is not None:
-            call_log.end_call(call_id, summary="Anruf abgebrochen (technischer Fehler).")
+            await _finalize("Anruf abgebrochen (technischer Fehler).")
         try:
             await ctx.api.room.delete_room(api.DeleteRoomRequest(room=ctx.room.name))
         except Exception:  # noqa: BLE001 - best-effort cleanup

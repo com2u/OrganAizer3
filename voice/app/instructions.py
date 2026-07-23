@@ -8,10 +8,32 @@ session/transport concerns so it can grow independently.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Optional
 
 from .config import AssistantConfig
 from .phonebook import Contact, format_notes
+
+_GERMAN_WEEKDAYS = (
+    "Montag",
+    "Dienstag",
+    "Mittwoch",
+    "Donnerstag",
+    "Freitag",
+    "Samstag",
+    "Sonntag",
+)
+
+
+def build_time_context(now: Optional[datetime] = None) -> str:
+    """Return the local date/time context captured at the start of a call."""
+    current = now or datetime.now().astimezone()
+    timezone_name = current.tzname() or "lokale Zeit"
+    return (
+        f"- Aktueller Wochentag: {_GERMAN_WEEKDAYS[current.weekday()]}\n"
+        f"- Aktuelles Datum: {current.strftime('%d.%m.%Y')}\n"
+        f"- Aktuelle Uhrzeit: {current.strftime('%H:%M')} Uhr ({timezone_name})"
+    )
 
 
 def _caller_block(contact: Optional[Contact]) -> str:
@@ -55,6 +77,7 @@ def build_instructions(
     assistant: AssistantConfig,
     contact: Optional[Contact] = None,
     knowledge: str = "",
+    now: Optional[datetime] = None,
 ) -> str:
     """Compose the system prompt from identity, caller context and knowledge."""
     return f"""
@@ -78,6 +101,12 @@ company {assistant.company}.
 - Keep responses brief and natural, as in a real spoken conversation.
 - Avoid long lists, markdown, emojis or special formatting: everything you say
   is spoken aloud.
+
+# Aktueller Zeitkontext
+Diese Angaben wurden unmittelbar zu Beginn dieses Gesprächs ermittelt. Nutze
+sie verbindlich, wenn der Anrufer nach Uhrzeit, Datum oder Wochentag fragt oder
+wenn sie für Termin- und Zeitangaben im Gespräch relevant sind:
+{build_time_context(now)}
 
 {_caller_block(contact)}
 

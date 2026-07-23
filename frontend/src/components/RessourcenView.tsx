@@ -20,7 +20,7 @@ type Tab = 'personen' | 'gruppen' | 'rollen' | 'raeume' | 'komponenten' | 'termi
 
 export default function RessourcenView() {
   const { t } = useTheme()
-  const [tab, setTab] = useState<Tab>('personen')
+  const [tab, setTab] = useState<Tab>('gruppen')
 
   return (
     <section className="view ressourcen-view">
@@ -34,12 +34,12 @@ export default function RessourcenView() {
 
       <div className="tab-bar">
         {([
-          ['personen', Users, 'res.tab.personen'],
           ['gruppen', Users, 'res.tab.gruppen'],
+          ['personen', Users, 'res.tab.personen'],
           ['rollen', Tag, 'res.tab.rollen'],
+          ['termine', Calendar, 'res.tab.termine'],
           ['raeume', MapPin, 'res.tab.raeume'],
           ['komponenten', Puzzle, 'res.tab.komponenten'],
-          ['termine', Calendar, 'res.tab.termine'],
         ] as const).map(([key, Icon, label]) => (
           <button
             key={key}

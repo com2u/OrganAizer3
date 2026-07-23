@@ -8,6 +8,7 @@ call termination). It is transport-agnostic: the same agent serves both phone
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Optional
 
 from livekit import api
@@ -34,13 +35,16 @@ class VoiceAssistant(Agent):
         contact: Optional[Contact] = None,
         caller_number: Optional[str] = None,
         knowledge: str = "",
+        call_started_at: Optional[datetime] = None,
     ) -> None:
         self._cfg = cfg
         self._phonebook = phonebook
         self._contact = contact
         self._caller_number = caller_number
         super().__init__(
-            instructions=build_instructions(cfg.assistant, contact, knowledge)
+            instructions=build_instructions(
+                cfg.assistant, contact, knowledge, now=call_started_at
+            )
         )
 
     @function_tool
