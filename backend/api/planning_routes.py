@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import tempfile
+import threading
 
 from flask import Blueprint, after_this_request, jsonify, request, send_file
 
@@ -245,8 +246,18 @@ def create_auftrag():
                 )
 
         if run_ai:
-            result = _run_ai_planning(db, auftrag, regel_ids, model)
-            return jsonify(result), 201
+            db.execute(
+                "UPDATE planungsauftraege SET status = 'laeuft', aktualisiert_am = datetime('now') WHERE id = ?",
+                (aid,),
+            )
+            threading.Thread(
+                target=_run_ai_job,
+                args=(aid, model),
+                name=f"planning-job-{aid}",
+                daemon=True,
+            ).start()
+            auftrag["status"] = "laeuft"
+            return jsonify(auftrag), 202
 
         return jsonify(auftrag), 201
     finally:
@@ -268,8 +279,20 @@ def run_auftrag(aid: int):
         regel_ids = [r["regel_id"] for r in regel_ids_rows]
 
         body = request.get_json(silent=True) or {}
-        result = _run_ai_planning(db, auftrag, regel_ids, (body.get("model") or DEFAULT_MODEL).strip())
-        return jsonify(result)
+        model = (body.get("model") or DEFAULT_MODEL).strip()
+        db.execute(
+            "UPDATE planungsauftraege SET status = 'laeuft', ergebnis_json = NULL, aktualisiert_am = datetime('now') WHERE id = ?",
+            (aid,),
+        )
+        threading.Thread(
+            target=_run_ai_job,
+            args=(aid, model),
+            name=f"planning-job-{aid}",
+            daemon=True,
+        ).start()
+        auftrag["status"] = "laeuft"
+        auftrag["ergebnis_json"] = None
+        return jsonify(auftrag), 202
     finally:
         db.disconnect()
 
@@ -406,6 +429,38 @@ def _run_ai_planning(db: DatabaseInterface, auftrag: dict, regel_ids: list, mode
         updated = db.fetchone("SELECT * FROM planungsauftraege WHERE id = ?", (aid,))
         updated["ergebnis"] = error_result
         return updated
+
+
+def _run_ai_job(aid: int, model: str) -> None:
+    """Execute a potentially long OpenRouter request outside the HTTP request."""
+    db = _get_db()
+    try:
+        auftrag = db.fetchone("SELECT * FROM planungsauftraege WHERE id = ?", (aid,))
+        if not auftrag:
+            return
+        rows = db.fetchall(
+            "SELECT regel_id FROM planungsauftrag_regeln WHERE auftrag_id = ? ORDER BY regel_id",
+            (aid,),
+        )
+        _run_ai_planning(db, auftrag, [row["regel_id"] for row in rows], model)
+    except Exception as exc:
+        logger.exception("Background planning job %s failed", aid)
+        result = {
+            "error": f"Planung fehlgeschlagen ({type(exc).__name__})",
+            "provider_status": "error",
+            "hinweis": "Der Hintergrundauftrag konnte nicht abgeschlossen werden.",
+            "vorschlaege": [],
+            "konflikte": [],
+            "bestehende_termine": 0,
+            "regeln_geladen": 0,
+        }
+        db.execute(
+            "UPDATE planungsauftraege SET status = 'fehler_provider', ergebnis_json = ?, "
+            "aktualisiert_am = datetime('now') WHERE id = ?",
+            (json.dumps(result, ensure_ascii=False), aid),
+        )
+    finally:
+        db.disconnect()
 
 
 # ===== Abhängigkeiten =====

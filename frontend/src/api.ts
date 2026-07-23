@@ -414,6 +414,13 @@ export async function fetchPlanungsauftraege(): Promise<Planungsauftrag[]> {
   return data
 }
 
+export async function fetchPlanungsauftrag(id: number): Promise<Planungsauftrag> {
+  const res = await apiFetch(`/planning/auftraege/${id}`)
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || 'Failed to fetch planning job')
+  return data
+}
+
 export async function createPlanungsauftrag(body: { bezeichnung?: string; woche_von: number; woche_bis: number; regel_ids?: number[]; run_ai?: boolean; model?: string }): Promise<Planungsauftrag> {
   const res = await apiFetch('/planning/auftraege', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   const data = await res.json()

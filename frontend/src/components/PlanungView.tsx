@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import {
   fetchPlanungsregeln, createPlanungsregel, updatePlanungsregel, deletePlanungsregel,
-  fetchPlanungsauftraege, createPlanungsauftrag, runPlanungsauftrag,
+  fetchPlanungsauftraege, fetchPlanungsauftrag, createPlanungsauftrag, runPlanungsauftrag,
   fetchWeeks, fetchAbhaengigkeiten, createAbhaengigkeit, updateAbhaengigkeit, deleteAbhaengigkeit,
   fetchOpenRouterModels, validatePlanning, downloadPlanningExcel
 } from '../api'
@@ -190,8 +190,27 @@ function PlanenTab() {
         run_ai: runAi,
         model,
       })
-      setResult(r)
-      const conflicts = r.ergebnis?.konflikte || []
+      let completed = r
+      setResult(completed)
+      if (runAi && completed.status === 'laeuft') {
+        const deadline = Date.now() + 15 * 60_000
+        let consecutivePollErrors = 0
+        while (completed.status === 'laeuft' && Date.now() < deadline) {
+          await new Promise(resolve => window.setTimeout(resolve, 2_000))
+          try {
+            completed = await fetchPlanungsauftrag(completed.id)
+            consecutivePollErrors = 0
+            setResult(completed)
+          } catch (pollError) {
+            consecutivePollErrors += 1
+            if (consecutivePollErrors >= 3) throw pollError
+          }
+        }
+        if (completed.status === 'laeuft') {
+          throw new Error('Die Planung läuft länger als 15 Minuten. Sie kann im Tab „Aufträge“ weiter verfolgt werden.')
+        }
+      }
+      const conflicts = completed.ergebnis?.konflikte || []
       if (conflicts.length) {
         setIssueTitle('Hinweise aus der Planung')
         setIssues(conflicts)

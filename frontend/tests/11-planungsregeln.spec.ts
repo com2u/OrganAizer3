@@ -59,3 +59,55 @@ test('Planen wählt Regeln vor und zeigt Validierung im Dialog', async ({ page }
   await expect(page.getByRole('dialog')).toContainText('Zeitkonflikt')
   await expect(page.getByRole('dialog')).toContainText('Regeln überschneiden sich.')
 })
+
+test('lange Planung wird per Statusabfrage ohne Request-Timeout abgeschlossen', async ({ page }) => {
+  let polls = 0
+  await page.route('**/api/planning/models', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      default: 'moonshotai/kimi-k3',
+      models: [{ id: 'moonshotai/kimi-k3', name: 'MoonshotAI: Kimi K3', description: '', pricing: {} }],
+    }),
+  }))
+  await page.route('**/api/planning/auftraege', async route => {
+    if (route.request().method() !== 'POST') return route.continue()
+    await route.fulfill({
+      status: 202,
+      contentType: 'application/json',
+      body: JSON.stringify({ id: 99, bezeichnung: 'Test', woche_von: 1, woche_bis: 1, status: 'laeuft', ergebnis_json: null }),
+    })
+  })
+  await page.route('**/api/planning/auftraege/99', route => {
+    polls += 1
+    const running = polls < 2
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 99,
+        bezeichnung: 'Test',
+        woche_von: 1,
+        woche_bis: 1,
+        status: running ? 'laeuft' : 'vorschlag',
+        ergebnis_json: null,
+        ergebnis: running ? null : {
+          provider_status: 'connected',
+          vorschlaege: [{ woche: 1, tag: 'Mon', start: '09:00', bespr_nr: 1 }],
+          konflikte: [],
+          bestehende_termine: 0,
+          regeln_geladen: 26,
+        },
+      }),
+    })
+  })
+
+  await login(page)
+  await page.locator('nav button[title*="Planung"]').first().click()
+  await page.getByRole('button', { name: /^Planen$/ }).click()
+  await page.getByRole('button', { name: /KI-Planung starten/ }).click()
+
+  await expect(page.getByRole('button', { name: /Planung läuft/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Excel-Vorschlag herunterladen/ })).toBeVisible({ timeout: 10_000 })
+  expect(polls).toBeGreaterThanOrEqual(2)
+})
