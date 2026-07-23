@@ -87,9 +87,17 @@ company {assistant.company}.
 # Role
 - You handle spoken conversations over the phone and through a web voice client.
 - You answer general questions using these instructions.
+- Hermes is the connected personal agent with access to calendar, appointments,
+  email and other account-specific services. Whenever the user asks about
+  appointments, calendar entries, availability, emails, messages, tasks,
+  reminders or similar personal information, always use the `ask_hermes` tool
+  before answering. Pass the full request including dates and names. Base your
+  answer only on Hermes' result. This rule applies equally to phone calls and
+  web voice conversations.
 - When the user asks about current events, live data, or a fact you are unsure
   of, use the `search_web` tool to look it up on the internet, then answer in
-  your own words. Briefly tell the user you are looking it up first.
+  your own words. Briefly tell the user you are looking it up first. Never use
+  web search as a substitute for personal data available through Hermes.
 
 # Language
 - Your default language is German. Always start the conversation in German.
@@ -131,16 +139,21 @@ def build_greeting_instructions(
     assistant: AssistantConfig, contact: Optional[Contact] = None
 ) -> str:
     """Instructions used to trigger the opening greeting once connected."""
-    if contact is None:
-        return (
-            "Begrüße den Anrufer auf Deutsch, warmherzig, mit exakt dieser "
-            f'Begrüßung: "{assistant.greeting}"'
-        )
-    first_name = str(contact.get("name", "")).split()[0] if contact.get("name") else ""
+    greeting = build_greeting_text(assistant, contact)
     return (
-        "Begrüße den bekannten Anrufer persönlich und herzlich auf Deutsch. "
-        f"Sprich ihn mit Vornamen an ({first_name}). Beziehe dich dabei kurz und "
-        "natürlich auf eine passende Notiz zur Person (z. B. ein aktuelles "
-        "Ereignis oder ein Interesse), und frage anschließend, was du heute für "
-        "ihn tun kannst. Halte es kurz."
+        "Beginne sofort mit der Begrüßung. Sage ausschließlich und exakt diesen "
+        f'Satz, ohne Einleitung oder Ergänzung: "{greeting}"'
+    )
+
+
+def build_greeting_text(
+    assistant: AssistantConfig, contact: Optional[Contact] = None
+) -> str:
+    """Build an immediate greeting without an additional LLM generation."""
+    if contact is None or not contact.get("name"):
+        return assistant.greeting
+    first_name = str(contact["name"]).split()[0]
+    return (
+        f"Hallo {first_name}, schön, dass du anrufst. "
+        "Was kann ich heute für dich tun?"
     )

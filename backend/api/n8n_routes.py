@@ -13,8 +13,8 @@ import urllib.error
 from flask import Blueprint, jsonify, request
 
 from backend import auth
-from backend.config import DB_PATH
-from backend.db.sqlite_adapter import SQLiteAdapter
+from backend.db.factory import get_database
+from backend.db.interface import DatabaseInterface
 
 logger = logging.getLogger(__name__)
 
@@ -29,8 +29,8 @@ def _enforce_auth():
 _URL_RE = re.compile(r"^https?://[^\s]+$", re.IGNORECASE)
 
 
-def _get_db() -> SQLiteAdapter:
-    db = SQLiteAdapter(DB_PATH)
+def _get_db() -> DatabaseInterface:
+    db = get_database()
     db.connect()
     return db
 

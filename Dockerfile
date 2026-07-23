@@ -50,6 +50,7 @@ RUN pip install --no-cache-dir -r requirements.txt gunicorn
 
 # Copy backend source and the initial schedule data
 COPY backend/ ./backend/
+COPY scripts/ ./scripts/
 COPY schedule.xlsx ./schedule.xlsx
 
 # Copy the built frontend from the first stage

@@ -5286,6 +5286,12 @@ button { font-family: inherit; }
 
 /* Voice Dialog (Sprache -> Dialog) */
 .dialog-wrapper { max-width: 640px; }
+.dialog-privacy {
+  margin: -4px 0 16px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 1.5;
+}
 .dialog-card {
   background: var(--bg-surface);
   border: 1px solid var(--border);

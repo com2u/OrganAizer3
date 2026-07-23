@@ -14,6 +14,7 @@ Run with:  python -m app.agent dev   (or  console / start)
 from __future__ import annotations
 
 import re
+import time
 from datetime import datetime
 from typing import Optional
 
@@ -77,6 +78,7 @@ async def entrypoint(ctx: JobContext) -> None:
     call_id: Optional[int] = None
     transcript: list[str] = []
     call_started_at = datetime.now().astimezone()
+    started_monotonic = time.monotonic()
     number: Optional[str] = None
     finalized = False
 
@@ -99,12 +101,20 @@ async def entrypoint(ctx: JobContext) -> None:
 
     try:
         await ctx.connect()
+        logger.info(
+            "Call startup: room connected after %.3fs.",
+            time.monotonic() - started_monotonic,
+        )
 
         # Wait briefly for the caller so we can read their phone number.
         try:
             await ctx.wait_for_participant()
         except Exception:  # noqa: BLE001 - web sessions may differ; continue anyway
             pass
+        logger.info(
+            "Call startup: participant ready after %.3fs.",
+            time.monotonic() - started_monotonic,
+        )
 
         number = _caller_number(ctx)
         contact: Optional[Contact] = phonebook.find(number) if number else None
@@ -152,9 +162,14 @@ async def entrypoint(ctx: JobContext) -> None:
         )
         logger.info("Realtime session started for room '%s'.", ctx.room.name)
 
-        # Greet the caller (personalised if known, standard greeting otherwise).
+        # Realtime models synthesize speech through generate_reply; unlike a
+        # separate TTS pipeline they do not support AgentSession.say().
         await session.generate_reply(
             instructions=build_greeting_instructions(config.assistant, contact)
+        )
+        logger.info(
+            "Call startup: greeting queued after %.3fs.",
+            time.monotonic() - started_monotonic,
         )
     except Exception:  # noqa: BLE001 - keep the worker alive on any failure
         # If the AI service cannot be reached (or anything else fails), tear the

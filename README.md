@@ -8,7 +8,7 @@
 
 ---
 
-## Version: 0.1.3 (July 2026)
+## Version: 0.1.10 (July 2026)
 
 ## Feature Overview
 
@@ -34,6 +34,12 @@
 
 ### Sprache (Speech)
 - TTS (Text vorlesen), STT (Sprache zu Text), Diktieren (microphone recording).
+- Live-Dialog with the voice assistant through an authenticated LiveKit room.
+- Browser signaling uses the TLS reverse proxy (`wss://terminlandschaft-api.ai-server.org/rtc`); the internal `ws://localhost:7880` address is never returned to remote browsers.
+
+### Telefonie
+- Incoming and outgoing SIP calls use the same LiveKit agent while remaining independent of the browser Dialog transport.
+- Phonebook, call notes, transcript summaries, and telephony configuration are persisted below the protected `data/` directory.
 
 ### KI Verbindungen (AI Connections)
 - 8 Providers: Ollama, llama.cpp, Amazon Bedrock, Copilot, OpenAI, Claude, Gemini, OpenRouter.
@@ -48,8 +54,10 @@
 
 - **Frontend**: React 18 + TypeScript + Vite, deployed on ionos (organaizer.app).
 - **Backend**: Flask + Gunicorn in Docker container on AI server (port 4815).
+- **Database**: Self-hosted Supabase PostgreSQL 17 with a private PostgREST endpoint and SQLite rollback copy.
 - **Auth**: OpenWebUI (shared login, no separate user database).
 - **API**: HTTPS reverse-proxy via nginx-proxy-manager (terminlandschaft-api.ai-server.org).
+- **Voice**: LiveKit + LiveKit SIP + Redis + a shared realtime voice-agent worker for browser and telephone sessions.
 - **Tests**: Playwright (84 tests, headless Chromium).
 
 ## Development
@@ -102,6 +110,8 @@ cd frontend && npm run test:report   # HTML report
 - `frontend/src/components/KIVerbindungView.tsx` — AI connections (8 providers)
 - `backend/api/routes.py` — All REST API endpoints
 - `backend/api/ai_connections_routes.py` — AI connection CRUD
+- `backend/telephony/livekit_token.py` — short-lived browser tokens and safe public WebSocket URL selection
+- `voice/app/agent.py` — shared browser-dialog and telephone voice worker
 - `Dockerfile` — Multi-stage: Node build + Python runtime (yt-dlp, ffmpeg, tesseract, deno)
 - `docker-compose.yml` — Container config
 - `playwright.config.ts` — Test configuration

@@ -23,6 +23,14 @@ Extend the weekly calendar with a filter to filter by person groups or by a meet
 With each new requirement update the requirements.md and readme.md.
 Describe the current architecture in a implementation.md
 
+## Voice Dialog and Telephony
+
+1. The authenticated Speech / Dialog view must establish a realtime audio session with the same assistant used for telephone calls.
+2. Browser clients must receive a publicly reachable encrypted `wss://` LiveKit endpoint; server-local `localhost` URLs must never be returned to remote browsers.
+3. Browser Dialog and SIP telephone sessions must remain independent transports so changes to one connection path do not interrupt the other.
+4. Connection attempts must fail within a bounded time, expose an understandable error, and recover visibly when LiveKit reconnects.
+5. Microphone access must start only after an explicit user action and the interface must explain the permission request.
+
 ## Startup
 
 Create a ./start.sh to start the application
@@ -39,4 +47,3 @@ Write automated tests to Test the functionality. Ensure the functionality is giv
 - Filter User Group C2
 - Filter User Group F2
 - Detail view of one entry
-

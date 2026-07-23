@@ -30,6 +30,46 @@ services:
     # Reach the host-networked voice stack (voice-web control API on :2300).
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+
+  # ===== Supabase data platform (database + REST API) =====
+  # PostgreSQL is never published on a public host interface. The application
+  # and migration CLI reach it only through the private Compose network.
+  supabase-db:
+    image: supabase/postgres:17.6.1.136
+    container_name: organaizer-supabase-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${SUPABASE_DB_NAME:-postgres}
+      POSTGRES_PASSWORD: ${SUPABASE_DB_PASSWORD}
+    volumes:
+      - ./data/supabase-db:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -U postgres -d ${SUPABASE_DB_NAME:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  supabase-rest:
+    image: postgrest/postgrest:v14.12
+    container_name: organaizer-supabase-rest
+    restart: unless-stopped
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${SUPABASE_DB_PASSWORD}@supabase-db:5432/${SUPABASE_DB_NAME:-postgres}
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_DB_MAX_ROWS: 1000
+      PGRST_SERVER_PORT: 3000
+    # Administrative access is intentionally bound to localhost only.
+    ports:
+      - "127.0.0.1:${SUPABASE_REST_PORT:-3002}:3000"
 
   # ===== n8n – Workflow Automation =====
   # Local n8n instance for the OrganAIzer n8n integration.
@@ -74,7 +114,11 @@ services:
     container_name: organaizer-redis
     network_mode: host
     restart: unless-stopped
-    command: ["redis-server", "--bind", "127.0.0.1"]
+    command:
+      ["redis-server", "--bind", "127.0.0.1", "--appendonly", "yes"]
+    volumes:
+      # Persist SIP trunks, dispatch rules and LiveKit coordination state.
+      - ./data/redis:/data
 
   livekit:
     image: livekit/livekit-server:latest
@@ -105,6 +149,9 @@ services:
     network_mode: host
     restart: unless-stopped
     depends_on: [livekit]
+    env_file:
+      # Supplies the protected Hermes API credentials from the target host.
+      - .env
     environment:
       - LIVEKIT_URL=ws://localhost:7880
       - OBSIDIAN_ROOT=/app/obsidian
@@ -121,6 +168,8 @@ services:
     network_mode: host
     restart: unless-stopped
     depends_on: [livekit, voice-agent]
+    env_file:
+      - .env
     environment:
       - LIVEKIT_URL=ws://localhost:7880
       # Public wss URL handed to browser Dialog clients is taken from the

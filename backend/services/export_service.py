@@ -78,7 +78,7 @@ def _export_termine(db: DatabaseInterface, wb: openpyxl.Workbook) -> None:
     )
     for t in termine:
         participants = db.fetchall(
-            "SELECT usergruppe FROM termin_teilnehmer WHERE bespr_nr = ? ORDER BY rowid",
+            "SELECT usergruppe FROM termin_teilnehmer WHERE bespr_nr = ? ORDER BY usergruppe",
             (t["bespr_nr"],),
         )
         row = [t["bespr_nr"], t["bezeichnung"], t["intervall"], t["dauer_min"]]
@@ -140,7 +140,7 @@ def _export_terminliste(db: DatabaseInterface, wb: openpyxl.Workbook) -> None:
     for r in rows:
         # Get participants for this meeting
         participants = db.fetchall(
-            "SELECT usergruppe FROM termin_teilnehmer WHERE bespr_nr = ? ORDER BY rowid",
+            "SELECT usergruppe FROM termin_teilnehmer WHERE bespr_nr = ? ORDER BY usergruppe",
             (r["bespr_nr"],),
         )
         teilnehmer_str = ", ".join(p["usergruppe"] for p in participants)

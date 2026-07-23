@@ -19,7 +19,7 @@ from .config import Config
 from .instructions import build_instructions
 from .logging_config import get_logger
 from .phonebook import Contact, Phonebook
-from .tools import web_search
+from .tools import query_hermes, web_search
 
 logger = get_logger("assistant")
 
@@ -74,6 +74,19 @@ class VoiceAssistant(Agent):
         return await web_search(query, self._cfg)
 
     @function_tool
+    async def ask_hermes(self, ctx: RunContext, query: str) -> str:
+        """Use Hermes for calendar, appointments, email and personal services.
+
+        Always use this tool when the caller asks about their appointments,
+        calendar entries, availability, emails, messages, tasks, reminders or
+        similar account-specific information. Pass the complete request,
+        including relevant dates, people and requested action. Do not use web
+        search for personal data that Hermes can access.
+        """
+        logger.info("Assistant delegated personal-data request to Hermes.")
+        return await query_hermes(query, self._cfg)
+
+    @function_tool
     async def end_call(self, ctx: RunContext) -> None:
         """End and hang up the call.
 
@@ -106,5 +119,33 @@ def build_session(cfg: Config) -> AgentSession:
         model=cfg.openai.model,
         voice=cfg.openai.voice,
         api_key=cfg.openai.api_key,
+        # Phone microphones are commonly used at a distance and in noisy
+        # environments. OpenAI performs this before server-side turn detection.
+        input_audio_noise_reduction="far_field",
+        # Keep the beginning of utterances and wait long enough for natural
+        # German pauses without making the assistant feel sluggish.
+        turn_detection={
+            "type": "server_vad",
+            "threshold": 0.55,
+            "prefix_padding_ms": 500,
+            "silence_duration_ms": 600,
+            "create_response": True,
+            "interrupt_response": True,
+        },
     )
-    return AgentSession(llm=realtime_model)
+    return AgentSession(
+        llm=realtime_model,
+        # SIP/WebRTC already provides echo handling. Avoid delaying the first
+        # utterance for the default three-second AEC warm-up.
+        aec_warmup_duration=0.0,
+        # Do not cut off the assistant for short noises or single filler words.
+        turn_handling={
+            "interruption": {
+                "enabled": True,
+                "mode": "vad",
+                "min_duration": 0.6,
+                "min_words": 2,
+                "resume_false_interruption": True,
+            }
+        },
+    )

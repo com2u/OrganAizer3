@@ -57,7 +57,9 @@ def save_config():
 @telephony_bp.get("/web-token")
 def web_token():
     try:
-        return jsonify(livekit_token.issue_web_token())
+        forwarded_proto = request.headers.get("X-Forwarded-Proto", request.scheme)
+        origin = f"{forwarded_proto}://{request.host}"
+        return jsonify(livekit_token.issue_web_token(request_origin=origin))
     except RuntimeError as exc:
         return jsonify({"error": str(exc)}), 409
 

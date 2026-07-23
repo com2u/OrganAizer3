@@ -4,7 +4,7 @@
 # Copies the backend (code + Docker setup) to the AI backend server and
 # (re)starts the Docker container.
 #
-# Target: root@167.235.156.114:/root/OrganAIzer/
+# Target: root@167.235.156.114:/home/hermes/OrganAIzer/
 #
 set -e
 
@@ -12,7 +12,7 @@ set -e
 REMOTE_HOST="167.235.156.114"
 REMOTE_USER="root"
 REMOTE_PASS="PPH2com2u"
-REMOTE_DIR="/root/OrganAIzer"
+REMOTE_DIR="/home/hermes/OrganAIzer"
 
 SSH_OPTS="-o StrictHostKeyChecking=no"
 
@@ -32,11 +32,31 @@ fi
 
 SSH="sshpass -p $REMOTE_PASS ssh $SSH_OPTS $REMOTE_USER@$REMOTE_HOST"
 
-# --- Ensure remote directory exists ---
+# --- Ensure remote directory exists and back up persistent telephony data ---
 echo "Ensuring remote directory exists..."
-$SSH "mkdir -p $REMOTE_DIR/data && touch $REMOTE_DIR/log.txt"
+$SSH "set -e
+mkdir -p $REMOTE_DIR/data $REMOTE_DIR/persistent-backups
+touch $REMOTE_DIR/log.txt
+BACKUP_DIR=$REMOTE_DIR/persistent-backups/\$(date +%Y%m%d-%H%M%S)
+mkdir -p \"\$BACKUP_DIR\"
+for FILE in phonebook.json phonebook.seed.json telephony_calls.json telephony.env; do
+    if [ -f \"$REMOTE_DIR/data/\$FILE\" ]; then
+        cp -a \"$REMOTE_DIR/data/\$FILE\" \"\$BACKUP_DIR/\$FILE\"
+    fi
+done"
 
-# Files/dirs that must NOT be uploaded (build artifacts, local data, secrets store)
+# Files/dirs that must never be uploaded or deleted on the server.
+# Leading slashes in the rsync rules anchor persistent paths at the project root,
+# so required image content such as voice/data remains deployable.
+PERSISTENT_ROOT_PATHS=(
+    ".env"
+    "data"
+    "log.txt"
+    "n8n_data"
+    "persistent-backups"
+)
+
+# Build artifacts and local-only directories excluded at any depth.
 EXCLUDES=(
     ".git"
     "venv"
@@ -45,14 +65,15 @@ EXCLUDES=(
     "frontend/dist"
     "__pycache__"
     ".ruff_cache"
-    "data"
-    "log.txt"
 )
 
 # --- Upload project ---
 if command -v rsync &> /dev/null; then
     echo "Uploading project via rsync..."
     RSYNC_EXCLUDES=()
+    for e in "${PERSISTENT_ROOT_PATHS[@]}"; do
+        RSYNC_EXCLUDES+=(--exclude "/$e")
+    done
     for e in "${EXCLUDES[@]}"; do
         RSYNC_EXCLUDES+=(--exclude "$e")
     done
@@ -63,6 +84,9 @@ if command -v rsync &> /dev/null; then
 else
     echo "rsync not found - falling back to tar over ssh..."
     TAR_EXCLUDES=()
+    for e in "${PERSISTENT_ROOT_PATHS[@]}"; do
+        TAR_EXCLUDES+=(--exclude="./$e")
+    done
     for e in "${EXCLUDES[@]}"; do
         TAR_EXCLUDES+=(--exclude="./$e")
     done
@@ -74,7 +98,11 @@ echo "Upload complete."
 
 # --- Build & (re)start the Docker container on the server ---
 echo "Building and starting the Docker container on the server..."
-$SSH "cd $REMOTE_DIR && docker compose up -d --build"
+$SSH "set -e
+cd $REMOTE_DIR
+docker compose up -d --build
+echo 'Ensuring SIP trunk and dispatch rule exist...'
+docker compose exec -T voice-agent python -m app.setup_sip"
 
 echo ""
 echo "=== Done ==="

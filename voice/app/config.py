@@ -98,6 +98,10 @@ class Config:
     knowledge_source: str
     obsidian_root: str
     obsidian_vault: str
+    # Host-local Hermes agent with access to calendar, email and other tools.
+    hermes_api_url: str
+    hermes_api_key: str
+    hermes_model: str
     # Health/metrics HTTP server of the agent worker. Bound to localhost and a
     # dedicated port so it never collides with the other services that share
     # the host network (LiveKit/SIP already use 8081).
@@ -152,6 +156,12 @@ class Config:
             knowledge_source=_get("KNOWLEDGE_SOURCE", "file"),
             obsidian_root=_get("OBSIDIAN_ROOT", "/app/obsidian"),
             obsidian_vault=_get("OBSIDIAN_VAULT", ""),
+            hermes_api_url=_get("HERMES_API_URL", "http://localhost:8642"),
+            hermes_api_key=_get(
+                "HERMES_API_SERVER_KEY",
+                _get("HERMES_API_KEY", ""),
+            ),
+            hermes_model=_get("HERMES_MODEL", "hermes-agent"),
             agent_http_host=_get("AGENT_HTTP_HOST", "127.0.0.1"),
             agent_http_port=int(_get("AGENT_HTTP_PORT", "8090")),
             log_level=_get("LOG_LEVEL", "INFO"),

@@ -1,5 +1,6 @@
 import { User } from '../types'
 import { useTheme } from '../ThemeContext'
+import packageJson from '../../package.json'
 import { Bot, Calendar, CheckSquare, Mic, BookOpen, Phone, Settings, LogOut, Users, ClipboardList, Cable, Plug } from 'lucide-react'
 
 export type CategoryKey =
@@ -57,7 +58,7 @@ export default function Sidebar({ active, onSelect, user, onLogout }: SidebarPro
       <div className="sidebar-brand">
         <img src="/organaizer.png" alt="OrganAIzer" className="brand-mark" />
         <span className="brand-text">
-          <strong>OrganAIzer <small className="brand-version">v0.1.7</small></strong>
+          <strong>OrganAIzer <small className="brand-version">v{packageJson.version}</small></strong>
           <small>AI Workspace</small>
         </span>
       </div>

@@ -32,10 +32,10 @@ test.describe('Sprache - Text vorlesen (TTS)', () => {
 
   test('voice selector exists with options', async () => {
     await expect(sharedPage.getByText('Stimme')).toBeVisible()
-    const voiceSelect = sharedPage.locator('select').filter({ hasText: /Anna|Killian|Jenny|Sonia/ })
+    const voiceSelect = sharedPage.locator('select').filter({ hasText: /Katja|Killian|Ava|Sonia/ })
     await expect(voiceSelect).toBeVisible()
     const options = voiceSelect.locator('option')
-    await expect(options.nth(0)).toContainText('Anna')
+    await expect(options.nth(0)).toContainText('Katja')
     await expect(options.nth(1)).toContainText('Killian')
   })
 

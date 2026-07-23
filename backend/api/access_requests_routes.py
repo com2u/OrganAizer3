@@ -12,14 +12,12 @@ we return a neutral confirmation (HTTP 200) without creating a duplicate.
 
 import logging
 import re
-import sqlite3
 import time
 from collections import defaultdict
 
 from flask import Blueprint, jsonify, request
 
-from backend.config import DB_PATH
-from backend.db.sqlite_adapter import SQLiteAdapter
+from backend.db.factory import get_database, integrity_errors
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +93,7 @@ def create_access_request():
     if len(zusatzinfos) > MAX_ZUSATZINFOS:
         return jsonify({"error": f"Zusatzinformationen dürfen maximal {MAX_ZUSATZINFOS} Zeichen haben."}), 400
 
-    db = SQLiteAdapter(DB_PATH)
+    db = get_database()
     db.connect()
     try:
         # Idempotency: return existing open request without creating a duplicate
@@ -108,14 +106,14 @@ def create_access_request():
             return jsonify({"request_id": existing["id"], "status": existing["status"]}), 200
 
         try:
-            db.execute(
+            request_id = db.insert_returning_id(
                 """
                 INSERT INTO zugangsanfragen (email, zusatzinfos, status)
                 VALUES (?, ?, 'open')
                 """,
                 (email, zusatzinfos),
             )
-        except sqlite3.IntegrityError:
+        except integrity_errors():
             # A concurrent request may have inserted the same open email
             # after the SELECT above. The partial unique index makes this
             # race safe; return the same neutral response as the fast path.
@@ -126,9 +124,6 @@ def create_access_request():
             if existing:
                 return jsonify({"request_id": existing["id"], "status": existing["status"]}), 200
             raise
-        db.conn.commit()  # type: ignore[union-attr]
-        row = db.fetchone("SELECT last_insert_rowid() AS id")
-        request_id = row["id"] if row else -1
         logger.info("New access request id=%s for email=%s", request_id, email)
         return jsonify({"request_id": request_id, "status": "open"}), 200
     finally:

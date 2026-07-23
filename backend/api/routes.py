@@ -10,8 +10,9 @@ from flask import Blueprint, g, jsonify, request, send_file
 
 from backend import auth
 from backend.api.logging_middleware import clear_log_entries, get_log_entries
-from backend.config import CONFIG_PATH, DB_PATH, HERMES_API_KEY, HERMES_API_URL, HERMES_MODEL
-from backend.db.sqlite_adapter import SQLiteAdapter
+from backend.config import CONFIG_PATH, HERMES_API_KEY, HERMES_API_URL, HERMES_MODEL
+from backend.db.factory import get_database
+from backend.db.interface import DatabaseInterface
 
 logger = logging.getLogger(__name__)
 
@@ -51,9 +52,9 @@ def auth_me():
     return jsonify(auth.public_user(user))
 
 
-def get_db() -> SQLiteAdapter:
+def get_db() -> DatabaseInterface:
     """Create and return a database connection."""
-    db = SQLiteAdapter(DB_PATH)
+    db = get_database()
     db.connect()
     return db
 
@@ -116,7 +117,7 @@ def get_week_appointments(week: int):
         result = []
         for r in rows:
             participants = db.fetchall(
-                "SELECT usergruppe FROM termin_teilnehmer WHERE bespr_nr = ? ORDER BY rowid",
+                "SELECT usergruppe FROM termin_teilnehmer WHERE bespr_nr = ? ORDER BY usergruppe",
                 (r["bespr_nr"],),
             )
             participant_codes = [p["usergruppe"] for p in participants]
@@ -170,7 +171,7 @@ def get_termin_detail(nr: int):
 
         # Get participant codes and resolve names
         participants = db.fetchall(
-            "SELECT usergruppe FROM termin_teilnehmer WHERE bespr_nr = ? ORDER BY rowid",
+            "SELECT usergruppe FROM termin_teilnehmer WHERE bespr_nr = ? ORDER BY usergruppe",
             (nr,),
         )
 
@@ -1136,8 +1137,10 @@ def hermes_improve_prompt():
 
 # ===== Task History =====
 
-def _ensure_task_history_table(db: SQLiteAdapter) -> None:
+def _ensure_task_history_table(db: DatabaseInterface) -> None:
     """Create task_history table if it does not exist."""
+    if getattr(db, "schema_managed_externally", False):
+        return
     db.execute("""
         CREATE TABLE IF NOT EXISTS task_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

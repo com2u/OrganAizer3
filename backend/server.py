@@ -18,13 +18,12 @@ from backend.api.telephony_routes import telephony_bp
 from backend.api.logging_middleware import register_logging_middleware
 from backend.config import (
     CORS_ORIGINS,
-    DB_PATH,
     FLASK_DEBUG,
     WEB_HOST,
     WEB_PORT,
     setup_logging,
 )
-from backend.db.sqlite_adapter import SQLiteAdapter
+from backend.db.factory import get_database
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -39,7 +38,7 @@ def create_app() -> Flask:
     register_logging_middleware(app)
 
     # Ensure all tables exist (idempotent, uses CREATE TABLE IF NOT EXISTS)
-    db = SQLiteAdapter(DB_PATH)
+    db = get_database()
     db.connect()
     db.create_tables()
     db.disconnect()

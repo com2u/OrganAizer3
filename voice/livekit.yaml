@@ -9,6 +9,22 @@ rtc:
   port_range_end: 50200
   # Detect the server's public IP so WebRTC media works from the internet.
   use_external_ip: true
+  # The agent and SFU share the host. Advertise loopback so their internal
+  # WebRTC connection does not wait on public/Docker ICE candidates.
+  enable_loopback_candidate: true
+  # Single public host without NAT/load balancing: ICE-Lite reduces connection
+  # setup round trips while external clients remain fully supported.
+  use_ice_lite: true
+  # Do not advertise irrelevant bridge/VPN/link-local candidates. The large
+  # candidate set previously added several seconds to every agent connection.
+  ips:
+    excludes:
+      - 10.0.0.0/8
+      - 172.16.0.0/12
+      - 192.168.0.0/16
+      - 100.64.0.0/10
+      - "fd00::/8"
+      - "fe80::/10"
 
 # Redis is required so the SIP service can coordinate with the server.
 redis:

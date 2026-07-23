@@ -22,8 +22,13 @@ class DatabaseInterface(ABC):
         ...
 
     @abstractmethod
-    def execute(self, query: str, params: tuple = ()) -> None:
+    def execute(self, query: str, params: tuple = ()) -> Any:
         """Execute a single query (INSERT, UPDATE, DELETE, DDL)."""
+        ...
+
+    @abstractmethod
+    def insert_returning_id(self, query: str, params: tuple = ()) -> int:
+        """Insert one row and return its generated integer primary key."""
         ...
 
     @abstractmethod

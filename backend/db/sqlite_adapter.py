@@ -33,11 +33,18 @@ class SQLiteAdapter(DatabaseInterface):
             self.conn = None
             logger.info("Disconnected from SQLite database")
 
-    def execute(self, query: str, params: tuple = ()) -> None:
+    def execute(self, query: str, params: tuple = ()) -> sqlite3.Cursor:
         """Execute a single write query."""
         assert self.conn is not None, "Database not connected"
-        self.conn.execute(query, params)
+        cursor = self.conn.execute(query, params)
         self.conn.commit()
+        return cursor
+
+    def insert_returning_id(self, query: str, params: tuple = ()) -> int:
+        cursor = self.execute(query, params)
+        if cursor.lastrowid is None:
+            raise RuntimeError("Insert did not generate an id")
+        return int(cursor.lastrowid)
 
     def executemany(self, query: str, params_list: list[tuple]) -> None:
         """Execute a query with multiple parameter sets."""

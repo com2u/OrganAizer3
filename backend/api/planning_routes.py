@@ -6,8 +6,8 @@ import logging
 from flask import Blueprint, jsonify, request
 
 from backend import auth
-from backend.config import DB_PATH
-from backend.db.sqlite_adapter import SQLiteAdapter
+from backend.db.factory import get_database
+from backend.db.interface import DatabaseInterface
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +19,8 @@ def _enforce_auth():
     return auth.enforce_auth()
 
 
-def _get_db() -> SQLiteAdapter:
-    db = SQLiteAdapter(DB_PATH)
+def _get_db() -> DatabaseInterface:
+    db = get_database()
     db.connect()
     return db
 
@@ -277,7 +277,7 @@ def apply_auftrag(aid: int):
         db.disconnect()
 
 
-def _run_ai_planning(db: SQLiteAdapter, auftrag: dict, regel_ids: list) -> dict:
+def _run_ai_planning(db: DatabaseInterface, auftrag: dict, regel_ids: list) -> dict:
     """Run AI-based planning via Hermes provider abstraction.
 
     If the AI provider is not configured or unreachable, returns an honest

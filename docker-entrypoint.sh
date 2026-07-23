@@ -11,8 +11,9 @@ echo "=== Terminlandschaft (Docker) ==="
 # Ensure the data directory exists
 mkdir -p "$(dirname "$DB_PATH")"
 
-# Import the schedule on first start (when the database is missing)
-if [ ! -f "$DB_PATH" ]; then
+# Import only for the SQLite fallback. Supabase is migrated explicitly before
+# DATABASE_URL is enabled, so container startup can never overwrite its data.
+if [ -z "${DATABASE_URL:-}" ] && [ ! -f "$DB_PATH" ]; then
     echo "No database found at $DB_PATH - importing schedule.xlsx ..."
     python -m backend.main import schedule.xlsx
 fi

@@ -28,7 +28,7 @@ test.describe('Login Flow', () => {
     await login(sharedPage)
     await expect(sharedPage.locator('nav')).toBeVisible()
     await expect(sharedPage.locator('nav').getByText('OrganAIzer')).toBeVisible()
-    await expect(sharedPage.locator('nav').getByRole('button', { name: 'Assistent' })).toBeVisible()
+    await expect(sharedPage.locator('nav').getByRole('button', { name: /^Assistent/ })).toBeVisible()
     await expect(sharedPage.locator('nav').getByRole('button', { name: 'Termine' })).toBeVisible()
     await expect(sharedPage.locator('nav').getByRole('button', { name: 'Aufgaben' })).toBeVisible()
     await expect(sharedPage.locator('nav').getByRole('button', { name: 'Sprache' })).toBeVisible()
@@ -41,9 +41,9 @@ test.describe('Login Flow', () => {
     await expect(sharedPage.locator('nav').getByText('admin')).toBeVisible()
   })
 
-  test('version v0.1.7 shown in sidebar', async () => {
+  test('version v0.1.10 shown in sidebar', async () => {
     // Already logged in
-    await expect(sharedPage.locator('nav').getByText('v0.1.7')).toBeVisible()
+    await expect(sharedPage.locator('nav').getByText('v0.1.10')).toBeVisible()
   })
 
   test('logout returns to landing page', async () => {

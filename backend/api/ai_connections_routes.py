@@ -12,8 +12,8 @@ from urllib.parse import urlparse
 from flask import Blueprint, jsonify, request
 
 from backend import auth
-from backend.config import DB_PATH
-from backend.db.sqlite_adapter import SQLiteAdapter
+from backend.db.factory import get_database
+from backend.db.interface import DatabaseInterface
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +42,8 @@ PROVIDER_CATEGORY_MAP = {
 _URL_RE = re.compile(r"^https?://[^\s]+$", re.IGNORECASE)
 
 
-def _get_db() -> SQLiteAdapter:
-    db = SQLiteAdapter(DB_PATH)
+def _get_db() -> DatabaseInterface:
+    db = get_database()
     db.connect()
     return db
 
@@ -174,7 +174,7 @@ def create_connection():
 
     db = _get_db()
     try:
-        cursor = db.execute(
+        new_id = db.insert_returning_id(
             """INSERT INTO ki_verbindungen (name, provider, kategorie, model_name, base_url, region, endpoint, secret_ref, aktiv, metadata_json)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (cleaned["name"], cleaned["provider"], cleaned["kategorie"],
@@ -182,7 +182,6 @@ def create_connection():
              cleaned["endpoint"], cleaned["secret_ref"], cleaned["aktiv"],
              cleaned["metadata_json"]),
         )
-        new_id = cursor.lastrowid
         row = db.fetchone("SELECT * FROM ki_verbindungen WHERE id = ?", (new_id,))
         return jsonify(_redact_row(row)), 201
     finally:

@@ -106,8 +106,22 @@ export default function DialogView() {
         addLog(t('dialog.sessionEnded'))
         teardown()
       })
+      room.on(RoomEvent.Reconnecting, () => {
+        setStatus('connecting')
+        setStatusText(t('dialog.reconnecting'))
+        addLog(t('dialog.reconnecting'))
+      })
+      room.on(RoomEvent.Reconnected, () => {
+        setStatus('live')
+        setStatusText(t('dialog.connected'))
+        addLog(t('dialog.reconnected'))
+      })
 
-      await room.connect(url, token)
+      await room.connect(url, token, {
+        websocketTimeout: 15_000,
+        peerConnectionTimeout: 20_000,
+        maxRetries: 2,
+      })
       setStatus('live')
       setStatusText(t('dialog.connected'))
       addLog(t('dialog.enablingMic'))
@@ -122,13 +136,19 @@ export default function DialogView() {
       addLog(t('dialog.active'))
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
+      const failedRoom = roomRef.current
+      roomRef.current = null
+      if (failedRoom) {
+        failedRoom.removeAllListeners()
+        await failedRoom.disconnect().catch(() => {})
+      }
+      stopMeters()
       setError(msg)
       setStatus('error')
       setStatusText(t('dialog.failed'))
       addLog(`Error: ${msg}`)
-      await disconnect().catch(() => {})
     }
-  }, [addLog, disconnect, startMeters, t, teardown])
+  }, [addLog, startMeters, stopMeters, t, teardown])
 
   const toggleMode = useCallback(async () => {
     const room = roomRef.current
@@ -147,6 +167,7 @@ export default function DialogView() {
     <div className="dialog-wrapper">
       <h3>{t('dialog.title')}</h3>
       <p className="view-sub">{t('dialog.sub')}</p>
+      <p className="dialog-privacy">{t('dialog.permissionHint')}</p>
 
       {error && <div className="telefonie-alert error"><AlertTriangle size={16} /> {error}</div>}
 

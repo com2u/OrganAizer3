@@ -15,7 +15,13 @@ export default defineConfig({
     timeout: 5_000,
   },
   use: {
-    baseURL: 'http://localhost:4815',
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:4815',
+    launchOptions: {
+      args: [
+        '--use-fake-device-for-media-stream',
+        '--use-fake-ui-for-media-stream',
+      ],
+    },
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'off',

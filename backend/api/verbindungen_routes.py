@@ -10,8 +10,8 @@ import logging
 from flask import Blueprint, jsonify, request
 
 from backend import auth
-from backend.config import DB_PATH
-from backend.db.sqlite_adapter import SQLiteAdapter
+from backend.db.factory import get_database
+from backend.db.interface import DatabaseInterface
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +46,8 @@ VALID_TEMPLATE_KEYS = (
 )
 
 
-def _get_db() -> SQLiteAdapter:
-    db = SQLiteAdapter(DB_PATH)
+def _get_db() -> DatabaseInterface:
+    db = get_database()
     db.connect()
     return db
 

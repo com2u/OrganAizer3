@@ -7,8 +7,8 @@ Usage:
 
 import sys
 
-from backend.config import DB_PATH, setup_logging
-from backend.db.sqlite_adapter import SQLiteAdapter
+from backend.config import setup_logging
+from backend.db.factory import get_database
 from backend.services.import_service import import_excel
 
 
@@ -24,7 +24,7 @@ def main() -> None:
     command = sys.argv[1]
     filepath = sys.argv[2]
 
-    db = SQLiteAdapter(DB_PATH)
+    db = get_database()
     db.connect()
 
     try:

@@ -4,11 +4,10 @@ import logging
 
 from flask import Blueprint, jsonify, request
 
-import sqlite3
 
 from backend import auth
-from backend.config import DB_PATH
-from backend.db.sqlite_adapter import SQLiteAdapter
+from backend.db.factory import get_database, integrity_errors
+from backend.db.interface import DatabaseInterface
 
 logger = logging.getLogger(__name__)
 
@@ -20,8 +19,8 @@ def _enforce_auth():
     return auth.enforce_auth()
 
 
-def _get_db() -> SQLiteAdapter:
-    db = SQLiteAdapter(DB_PATH)
+def _get_db() -> DatabaseInterface:
+    db = get_database()
     db.connect()
     return db
 
@@ -386,7 +385,7 @@ def list_gruppen():
         db.disconnect()
 
 
-def _gruppe_with_members(db: SQLiteAdapter, gruppe: str) -> dict | None:
+def _gruppe_with_members(db: DatabaseInterface, gruppe: str) -> dict | None:
     row = db.fetchone("SELECT gruppe, bereich FROM bereiche WHERE gruppe = ?", (gruppe,))
     if not row:
         return None
@@ -438,7 +437,7 @@ def delete_gruppe(gruppe: str):
             return jsonify({"error": "Gruppe nicht gefunden"}), 404
         try:
             db.execute("DELETE FROM bereiche WHERE gruppe = ?", (gruppe,))
-        except sqlite3.IntegrityError:
+        except integrity_errors():
             return jsonify({"error": "Gruppe hat noch Mitglieder und kann nicht gelöscht werden"}), 409
         return jsonify({"status": "ok"})
     finally:
@@ -496,7 +495,7 @@ def delete_mitglied(nummer: str):
             return jsonify({"error": "Mitglied nicht gefunden"}), 404
         try:
             db.execute("DELETE FROM usergruppen WHERE nummer = ?", (nummer,))
-        except sqlite3.IntegrityError:
+        except integrity_errors():
             return jsonify({"error": "Mitglied wird noch verwendet und kann nicht gelöscht werden"}), 409
         return jsonify({"status": "ok"})
     finally:
@@ -522,7 +521,7 @@ def list_termine():
         db.disconnect()
 
 
-def _termin_with_intervall(db: SQLiteAdapter, nr: int) -> dict | None:
+def _termin_with_intervall(db: DatabaseInterface, nr: int) -> dict | None:
     return db.fetchone(
         """SELECT t.bespr_nr, t.bezeichnung, t.intervall, t.dauer_min,
                   i.bedeutung as intervall_text
@@ -603,7 +602,7 @@ def delete_termin(nr: int):
         db.execute("DELETE FROM termin_teilnehmer WHERE bespr_nr = ?", (nr,))
         try:
             db.execute("DELETE FROM termine WHERE bespr_nr = ?", (nr,))
-        except sqlite3.IntegrityError:
+        except integrity_errors():
             return jsonify({"error": "Termin ist noch verplant und kann nicht gelöscht werden"}), 409
         return jsonify({"status": "ok"})
     finally:

@@ -626,6 +626,8 @@ const T: Translations = {
   'dialog.notConnected': { de: 'Nicht verbunden', en: 'Not connected' },
   'dialog.connecting': { de: 'Verbinde…', en: 'Connecting…' },
   'dialog.connected': { de: 'Verbunden', en: 'Connected' },
+  'dialog.reconnecting': { de: 'Verbindung wird wiederhergestellt…', en: 'Reconnecting…' },
+  'dialog.reconnected': { de: 'Verbindung wiederhergestellt.', en: 'Connection restored.' },
   'dialog.failed': { de: 'Verbindung fehlgeschlagen', en: 'Connection failed' },
   'dialog.start': { de: 'Gespräch starten', en: 'Start conversation' },
   'dialog.end': { de: 'Gespräch beenden', en: 'End conversation' },
@@ -642,6 +644,7 @@ const T: Translations = {
   'dialog.active': { de: 'Sprachdialog aktiv. Der Assistent begrüßt Sie gleich.', en: 'Voice dialog active. The assistant will greet you shortly.' },
   'dialog.ending': { de: 'Beende Gespräch…', en: 'Ending conversation…' },
   'dialog.sessionEnded': { de: 'Sitzung beendet.', en: 'Session ended.' },
+  'dialog.permissionHint': { de: 'Beim Start fragt der Browser nach Mikrofonzugriff. Die Audioverbindung läuft verschlüsselt über LiveKit.', en: 'Your browser will request microphone access when starting. Audio is encrypted in transit through LiveKit.' },
 
   // Dictation
   'sprache.dictation': { de: 'Diktieren', en: 'Dictation' },
