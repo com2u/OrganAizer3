@@ -5,7 +5,7 @@ import {
   Search, Clock, Tag, Loader2, FolderOpen, ChevronRight, ChevronDown,
   File, Folder, RefreshCw, Save, AlertTriangle, ArrowUpDown, ArrowUp, ArrowDown,
   LibraryBig, Plus, ExternalLink, ShieldCheck, Sparkles, KeyRound, Check,
-  Presentation, Maximize2, Clapperboard,
+  Presentation, Maximize2, Clapperboard, Trash2, Upload, FolderPlus, MonitorPlay,
 } from 'lucide-react'
 import {
   fetchObsidianTree, searchObsidian, fetchObsidianTags, fetchObsidianRecent,
@@ -14,7 +14,10 @@ import {
   ObsidianSearchResult, ObsidianTag, ObsidianNote,
   fetchOpenNotebookStatus, fetchOpenNotebookAccess, fetchResearchNotebooks, createResearchNotebook,
   OpenNotebookStatus, ResearchNotebook,
-  fetchIntegrationCapabilities, IntegrationCapabilities, fetchSlidevProject, saveSlidevProject,
+  fetchIntegrationCapabilities, IntegrationCapabilities,
+  fetchSlidevProjects, createSlidevProject, deleteSlidevProject, activateSlidevProject,
+  fetchSlidevProjectContent, saveSlidevProjectContent, createSlidevFolder, uploadSlidevFile,
+  deleteSlidevFile, SlidevFileNode, SlidevProject,
   fetchWorkspaceTicket, fetchHyperframesStatus,
 } from '../api'
 
@@ -747,43 +750,175 @@ function ResearchNotebooksTab() {
 
 function SlidevTab({ publicUrl }: { publicUrl: string }) {
   const { theme } = useTheme()
-  const [mode, setMode] = useState<'editor' | 'presentation'>('editor')
+  const [mode, setMode] = useState<'editor' | 'presentation' | 'presenter'>('editor')
+  const [projects, setProjects] = useState<SlidevProject[]>([])
+  const [activeProject, setActiveProject] = useState('')
+  const [selectedProject, setSelectedProject] = useState('')
+  const [selectedFolder, setSelectedFolder] = useState('public')
+  const [expanded, setExpanded] = useState<Set<string>>(new Set(['public']))
   const [content, setContent] = useState('')
   const [message, setMessage] = useState('')
   const [embedUrl, setEmbedUrl] = useState('')
-  const frame = useCallback((node: HTMLIFrameElement | null) => { (window as unknown as { __slidevFrame?: HTMLIFrameElement }).__slidevFrame = node || undefined }, [])
+  const [busy, setBusy] = useState(false)
+  const frameRef = useRef<HTMLIFrameElement>(null)
+  const uploadRef = useRef<HTMLInputElement>(null)
+
+  const loadProjects = useCallback(async (preferred?: string) => {
+    const result = await fetchSlidevProjects()
+    setProjects(result.projects)
+    setActiveProject(result.active)
+    const selected = preferred && result.projects.some(p => p.name === preferred)
+      ? preferred
+      : selectedProject && result.projects.some(p => p.name === selectedProject)
+        ? selectedProject
+        : result.active
+    setSelectedProject(selected)
+    const project = await fetchSlidevProjectContent(selected)
+    setContent(project.content)
+  }, [selectedProject])
+
   useEffect(() => {
-    fetchSlidevProject().then(r => setContent(r.content)).catch(e => setMessage(e.message))
+    loadProjects().catch(e => setMessage(e instanceof Error ? e.message : String(e)))
   }, [])
+
+  const current = projects.find(project => project.name === selectedProject)
   const save = async () => {
     setMessage('Speichert…')
-    try { await saveSlidevProject(content); setMessage('Gespeichert. Slidev lädt die Präsentation automatisch neu.') }
+    try { await saveSlidevProjectContent(selectedProject, content); setMessage('Gespeichert. Slidev lädt die Präsentation automatisch neu.') }
     catch (e) { setMessage(e instanceof Error ? e.message : String(e)) }
   }
-  const fullscreen = () => {
-    const el = (window as unknown as { __slidevFrame?: HTMLIFrameElement }).__slidevFrame
-    el?.requestFullscreen?.()
-  }
-  const openPresentation = async () => {
-    setMode('presentation')
-    setMessage('Sicherer Präsentationszugang wird vorbereitet…')
+
+  const selectProject = async (name: string) => {
+    setSelectedProject(name)
+    setSelectedFolder('public')
+    setMessage('Lädt…')
     try {
+      const project = await fetchSlidevProjectContent(name)
+      setContent(project.content)
+      setMode('editor')
+      setMessage('')
+    } catch (e) { setMessage(e instanceof Error ? e.message : String(e)) }
+  }
+
+  const activate = async () => {
+    if (!selectedProject || selectedProject === activeProject) return
+    setBusy(true)
+    setMessage('Präsentation wird aktiviert…')
+    try {
+      await activateSlidevProject(selectedProject)
+      await loadProjects(selectedProject)
+      setMessage('Aktiviert. Slidev startet die Präsentation neu.')
+    } catch (e) { setMessage(e instanceof Error ? e.message : String(e)) }
+    finally { setBusy(false) }
+  }
+
+  const createProject = async () => {
+    const name = window.prompt('Name der neuen Präsentation')
+    if (!name) return
+    try { await createSlidevProject(name); await loadProjects(name); setMessage('Präsentation angelegt.') }
+    catch (e) { setMessage(e instanceof Error ? e.message : String(e)) }
+  }
+
+  const removeProject = async () => {
+    if (!selectedProject || !window.confirm(`Präsentation „${selectedProject}“ mit allen Dateien löschen?`)) return
+    try { await deleteSlidevProject(selectedProject); setSelectedProject(''); await loadProjects(); setMessage('Präsentation gelöscht.') }
+    catch (e) { setMessage(e instanceof Error ? e.message : String(e)) }
+  }
+
+  const createFolder = async () => {
+    const name = window.prompt(`Neuer Ordner in /${selectedFolder}`)
+    if (!name) return
+    try { await createSlidevFolder(selectedProject, selectedFolder, name); await loadProjects(selectedProject); setExpanded(old => new Set(old).add(selectedFolder)); setMessage('Ordner angelegt.') }
+    catch (e) { setMessage(e instanceof Error ? e.message : String(e)) }
+  }
+
+  const upload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || [])
+    if (!files.length) return
+    setBusy(true)
+    try {
+      for (const file of files) await uploadSlidevFile(selectedProject, selectedFolder, file)
+      await loadProjects(selectedProject)
+      const publicPath = selectedFolder.replace(/^public\/?/, '')
+      setMessage(`${files.length} Datei(en) hochgeladen. In Slidev unter /${publicPath ? `${publicPath}/` : ''}… verwendbar.`)
+    } catch (e) { setMessage(e instanceof Error ? e.message : String(e)) }
+    finally { event.target.value = ''; setBusy(false) }
+  }
+
+  const removeFile = async (path: string) => {
+    if (!window.confirm(`„${path}“ löschen?`)) return
+    try { await deleteSlidevFile(selectedProject, path); await loadProjects(selectedProject); setMessage('Datei gelöscht.') }
+    catch (e) { setMessage(e instanceof Error ? e.message : String(e)) }
+  }
+
+  const openWorkspace = async (nextMode: 'presentation' | 'presenter') => {
+    setMode(nextMode)
+    setMessage(nextMode === 'presenter' ? 'Sprecheransicht wird vorbereitet…' : 'Präsentationszugang wird vorbereitet…')
+    try {
+      if (selectedProject !== activeProject) {
+        await activateSlidevProject(selectedProject)
+        setActiveProject(selectedProject)
+        // The isolated Slidev supervisor needs a few seconds to stop Vite,
+        // release the port, and boot the newly selected deck.
+        await new Promise(resolve => window.setTimeout(resolve, 7000))
+      }
       const ticket = await fetchWorkspaceTicket('slidev')
-      setEmbedUrl(`${new URL(publicUrl).origin}/workspace-login/slidev?ticket=${encodeURIComponent(ticket)}`)
+      const presenter = nextMode === 'presenter' ? '&view=presenter' : ''
+      setEmbedUrl(`${new URL(publicUrl).origin}/workspace-login/slidev?ticket=${encodeURIComponent(ticket)}${presenter}`)
       setMessage('')
     } catch (e) {
       setMessage(e instanceof Error ? e.message : String(e))
     }
   }
+
+  const renderTree = (nodes: SlidevFileNode[], depth = 0): React.ReactNode => nodes.map(node => {
+    const isFolder = node.type === 'directory'
+    const isOpen = expanded.has(node.path)
+    return <div key={node.path}>
+      <div className={`slidev-file-row${selectedFolder === node.path ? ' selected' : ''}`} style={{ paddingLeft: 8 + depth * 16 }} onDoubleClick={() => isFolder && setSelectedFolder(node.path)}>
+        <button className="slidev-file-main" onClick={() => {
+          if (isFolder) {
+            setSelectedFolder(node.path)
+            setExpanded(old => { const next = new Set(old); next.has(node.path) ? next.delete(node.path) : next.add(node.path); return next })
+          }
+        }}>
+          {isFolder ? isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} /> : <span className="tree-spacer" />}
+          {isFolder ? <Folder size={15} /> : <File size={15} />}
+          <span>{node.name}</span>
+          {!isFolder && node.size !== undefined && <small>{node.size < 1024 * 1024 ? `${Math.ceil(node.size / 1024)} KB` : `${(node.size / 1024 / 1024).toFixed(1)} MB`}</small>}
+        </button>
+        {node.path !== 'slides.md' && node.path !== 'public' && <button className="icon-btn danger" title="Löschen" onClick={() => removeFile(node.path)}><Trash2 size={13} /></button>}
+      </div>
+      {isFolder && isOpen && node.children && renderTree(node.children, depth + 1)}
+    </div>
+  })
+
   return <div className="slidev-workspace">
     <div className="slidev-toolbar">
-      <div className="segmented"><button className={mode === 'editor' ? 'active' : ''} onClick={() => setMode('editor')}>Markdown bearbeiten</button><button className={mode === 'presentation' ? 'active' : ''} onClick={openPresentation}>Präsentation</button></div>
-      {mode === 'editor' ? <button className="primary-btn" onClick={save}><Save size={15} /> Speichern</button> : <><button className="secondary-btn" onClick={openPresentation}><RefreshCw size={15} /> Neu verbinden</button><button className="primary-btn" onClick={fullscreen}><Maximize2 size={15} /> Vollbild</button></>}
+      <div className="segmented">
+        <button className={mode === 'editor' ? 'active' : ''} onClick={() => setMode('editor')}>Bearbeiten</button>
+        <button className={mode === 'presentation' ? 'active' : ''} onClick={() => openWorkspace('presentation')}><Presentation size={14} /> Präsentation</button>
+        <button className={mode === 'presenter' ? 'active' : ''} onClick={() => openWorkspace('presenter')}><MonitorPlay size={14} /> Sprecheransicht</button>
+      </div>
+      {mode === 'editor'
+        ? <div className="workspace-actions"><button className="secondary-btn" disabled={!selectedProject || selectedProject === activeProject || busy} onClick={activate}>Aktivieren</button><button className="primary-btn" disabled={!selectedProject || busy} onClick={save}><Save size={15} /> Speichern</button></div>
+        : <div className="workspace-actions"><button className="secondary-btn" onClick={() => openWorkspace(mode)}><RefreshCw size={15} /> Neu verbinden</button><button className="primary-btn" onClick={() => frameRef.current?.requestFullscreen?.()}><Maximize2 size={15} /> Vollbild</button></div>}
     </div>
     {message && <p className="slidev-message">{message}</p>}
     {mode === 'editor'
-      ? <div data-color-mode={theme === 'dark' ? 'dark' : 'light'}><MDEditor value={content} onChange={v => setContent(v || '')} height={620} preview="live" /></div>
-      : embedUrl ? <iframe ref={frame} className="slidev-frame" src={embedUrl} title="Slidev Präsentation" allow="fullscreen" /> : <div className="embedded-loading"><Loader2 className="spin" /> Verbindung wird vorbereitet…</div>}
+      ? <div className="slidev-editor-layout">
+          <aside className="slidev-project-browser">
+            <div className="slidev-browser-header"><strong>Präsentationen</strong><button className="icon-btn" title="Neue Präsentation" onClick={createProject}><Plus size={16} /></button></div>
+            <div className="slidev-project-list">{projects.map(project => <button key={project.name} className={`slidev-project-item${selectedProject === project.name ? ' selected' : ''}`} onClick={() => selectProject(project.name)}><Presentation size={15} /><span>{project.name}</span>{project.active && <span className="active-dot" title="Aktiv" />}</button>)}</div>
+            <div className="slidev-browser-header files"><strong>Dateien</strong><div><button className="icon-btn" title="Ordner anlegen" onClick={createFolder}><FolderPlus size={15} /></button><button className="icon-btn" title="Dateien hochladen" onClick={() => uploadRef.current?.click()}><Upload size={15} /></button></div></div>
+            <div className="slidev-folder-path">/{selectedFolder}</div>
+            <input ref={uploadRef} type="file" multiple hidden accept="image/*,video/*,audio/*,.pdf,.svg,.gif,.webp,.woff,.woff2,.ttf,.otf" onChange={upload} />
+            <div className="slidev-file-tree">{current?.tree.children && renderTree(current.tree.children)}</div>
+            <button className="slidev-delete-project" disabled={!selectedProject || selectedProject === activeProject} onClick={removeProject}><Trash2 size={14} /> Präsentation löschen</button>
+          </aside>
+          <main className="slidev-markdown-editor" data-color-mode={theme === 'dark' ? 'dark' : 'light'}><MDEditor value={content} onChange={v => setContent(v || '')} height={650} preview="live" /></main>
+        </div>
+      : embedUrl ? <iframe ref={frameRef} className="slidev-frame" src={embedUrl} title={mode === 'presenter' ? 'Slidev Sprecheransicht' : 'Slidev Präsentation'} allow="fullscreen" /> : <div className="embedded-loading"><Loader2 className="spin" /> Verbindung wird vorbereitet…</div>}
   </div>
 }
 

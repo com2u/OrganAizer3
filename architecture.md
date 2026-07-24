@@ -26,6 +26,15 @@ the authenticated SPA requests a short-lived signed ticket, the external HTTPS
 host exchanges it for an HttpOnly partitioned cookie, and Nginx `auth_request`
 checks that cookie for HTML, assets, and WebSocket upgrades.
 
+Slidev stores presentations below `data/slidev/projects/<project>/`. The backend
+validates all project-relative paths and manages Markdown, folders, and media;
+`.active-project` is an atomic pointer consumed by the Slidev container
+entrypoint. Its lightweight supervisor restarts only the Slidev child process
+when that pointer changes. Audience and presenter views share the same
+authenticated reverse proxy, with presenter mode routed to
+`/slidev/presenter/`. The API proxy permits request bodies up to 110 MB, while
+the Slidev backend enforces a 100 MB per-file limit.
+
 ## Open Notebook integration
 
 ```text
@@ -129,7 +138,7 @@ OrganAizer3/
 ├── README.md                       # Primary setup, operation, and user documentation.
 ├── Dockerfile                      # Builds the React bundle and Flask production image.
 ├── docker-compose.yml              # Defines the application, Supabase, external workspaces, and voice stack.
-├── slidev/                          # Builds the isolated Slidev presentation service.
+├── slidev/                          # Builds and supervises the multi-project Slidev presentation service.
 ├── hyperframes/                     # Builds the Node 22, Chromium, and FFmpeg renderer/studio service.
 ├── docker-entrypoint.sh            # Starts Flask and performs only the safe SQLite first-run import.
 ├── requirements.txt                # Declares Python dependencies for the main backend.

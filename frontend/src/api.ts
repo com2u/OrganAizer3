@@ -847,6 +847,77 @@ export async function saveSlidevProject(content: string): Promise<void> {
   }
 }
 
+export interface SlidevFileNode {
+  name: string
+  path: string
+  type: 'file' | 'directory'
+  size?: number
+  children?: SlidevFileNode[]
+}
+
+export interface SlidevProject {
+  name: string
+  active: boolean
+  tree: SlidevFileNode
+}
+
+export async function fetchSlidevProjects(): Promise<{ active: string; projects: SlidevProject[] }> {
+  const res = await apiFetch('/slidev/projects')
+  if (!res.ok) throw new Error('Präsentationen konnten nicht geladen werden')
+  return res.json()
+}
+
+export async function createSlidevProject(name: string): Promise<void> {
+  const res = await apiFetch('/slidev/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Präsentation konnte nicht erstellt werden')
+}
+
+export async function deleteSlidevProject(name: string): Promise<void> {
+  const res = await apiFetch(`/slidev/projects/${encodeURIComponent(name)}`, { method: 'DELETE' })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Präsentation konnte nicht gelöscht werden')
+}
+
+export async function activateSlidevProject(name: string): Promise<void> {
+  const res = await apiFetch(`/slidev/projects/${encodeURIComponent(name)}/activate`, { method: 'PUT' })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Präsentation konnte nicht aktiviert werden')
+}
+
+export async function fetchSlidevProjectContent(name: string): Promise<{ content: string }> {
+  const res = await apiFetch(`/slidev/projects/${encodeURIComponent(name)}/content`)
+  if (!res.ok) throw new Error('Präsentation konnte nicht geladen werden')
+  return res.json()
+}
+
+export async function saveSlidevProjectContent(name: string, content: string): Promise<void> {
+  const res = await apiFetch(`/slidev/projects/${encodeURIComponent(name)}/content`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Präsentation konnte nicht gespeichert werden')
+}
+
+export async function createSlidevFolder(project: string, parent: string, name: string): Promise<void> {
+  const res = await apiFetch(`/slidev/projects/${encodeURIComponent(project)}/folders`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ parent, name }) })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Ordner konnte nicht erstellt werden')
+}
+
+export async function uploadSlidevFile(project: string, parent: string, file: File): Promise<void> {
+  const form = new FormData()
+  form.append('parent', parent)
+  form.append('file', file)
+  const res = await apiFetch(`/slidev/projects/${encodeURIComponent(project)}/files`, { method: 'POST', body: form })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Datei konnte nicht hochgeladen werden')
+}
+
+export async function deleteSlidevFile(project: string, path: string): Promise<void> {
+  const res = await apiFetch(`/slidev/projects/${encodeURIComponent(project)}/files/${path.split('/').map(encodeURIComponent).join('/')}`, { method: 'DELETE' })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Datei konnte nicht gelöscht werden')
+}
+
 export async function fetchWorkspaceTicket(target: 'slidev' | 'hyperframes'): Promise<string> {
   const res = await apiFetch(`/workspace-auth/ticket/${target}`)
   const data = await res.json().catch(() => ({}))

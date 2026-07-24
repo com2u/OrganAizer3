@@ -8,7 +8,22 @@
 
 ---
 
-## Version: 0.1.18 (July 2026)
+## Version: 0.1.19 (July 2026)
+
+### Slidev presentation workspace
+
+The presentation workspace now manages any number of Slidev projects. Each
+project has its own Markdown deck and persistent `public/` media tree for
+images, backgrounds, audio, video, fonts, and other supporting files. The
+integrated browser creates and deletes projects and folders, uploads multiple
+files (up to 100 MB each), and safely removes media without exposing paths
+outside the selected project.
+
+Alongside editing and the audience presentation, **Presenter view** embeds
+Slidev's native speaker console with the same automatic OrganAIzer workspace
+authentication. Activating another project causes the isolated Slidev service
+to restart that deck automatically while all project data remains mounted below
+`data/slidev/projects`.
 
 ### Research notebooks (Open Notebook)
 

@@ -1,5 +1,21 @@
 # Terminlandschaft - Requirements
 
+## Slidev project and media workspace (0.1.19)
+
+- Users can create, select, activate, and delete multiple presentations.
+- Every presentation owns an independent Markdown file and navigable folder
+  tree; projects persist across container updates.
+- Users can create folders and upload or delete images, backgrounds, videos,
+  audio, fonts, PDFs, and other media files up to 100 MB.
+- The API reverse proxy accepts presentation uploads up to 110 MB while the
+  backend enforces the 100 MB per-file application limit.
+- Path traversal is rejected, and the active project, `slides.md`, and the
+  project's public media root are protected against accidental deletion.
+- The workspace offers editing, audience presentation, native Slidev presenter
+  view, reconnect, and browser fullscreen modes.
+- Switching projects restarts only the Slidev process and keeps OrganAIzer,
+  telephony, and other external workspaces available.
+
 ## Configurable external workspaces (0.1.18)
 
 - Open Notebook, n8n, and Slidev tabs appear only when their external

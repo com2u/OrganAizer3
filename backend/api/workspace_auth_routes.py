@@ -27,7 +27,10 @@ def login(target: str):
     token = request.args.get("ticket", "")
     if target not in ALLOWED_TARGETS or not verify(token, target):
         return "Ungültiger oder abgelaufener Workspace-Zugang.", 401
-    response = make_response(redirect(SAFE_NEXT[target], code=302))
+    destination = SAFE_NEXT[target]
+    if target == "slidev" and request.args.get("view") == "presenter":
+        destination = "/slidev/presenter/"
+    response = make_response(redirect(destination, code=302))
     response.set_cookie(
         f"organaizer_{target}_embed",
         issue(target, 8 * 60 * 60),
