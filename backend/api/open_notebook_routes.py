@@ -1,22 +1,25 @@
 """Authenticated, server-side bridge to the Open Notebook REST API."""
 
 import logging
-import os
-
 import requests
 from flask import Blueprint, jsonify, request
 
 from backend import auth
+from backend.integration_config import read_config
 
 logger = logging.getLogger(__name__)
 open_notebook_bp = Blueprint("open_notebook", __name__)
 
-_BASE_URL = os.getenv("OPEN_NOTEBOOK_API_URL", "http://open-notebook:5055").rstrip("/")
-_PUBLIC_URL = os.getenv(
-    "OPEN_NOTEBOOK_PUBLIC_URL", "https://open-notebook.ai-server.org"
-).rstrip("/")
-_PASSWORD = os.getenv("OPEN_NOTEBOOK_PASSWORD", "")
 _TIMEOUT = 12
+
+
+def _settings():
+    cfg = read_config("open_notebook")
+    return (
+        str(cfg.get("api_url") or "http://open-notebook:5055").rstrip("/"),
+        str(cfg.get("public_url") or "https://open-notebook.ai-server.org").rstrip("/"),
+        str(cfg.get("password") or ""),
+    )
 
 
 @open_notebook_bp.before_request
@@ -25,17 +28,19 @@ def _enforce_auth():
 
 
 def _headers() -> dict[str, str]:
+    _, _, password = _settings()
     headers = {"Accept": "application/json"}
-    if _PASSWORD:
-        headers["Authorization"] = f"Bearer {_PASSWORD}"
+    if password:
+        headers["Authorization"] = f"Bearer {password}"
     return headers
 
 
 def _forward(method: str, path: str, payload=None):
+    base_url, _, _ = _settings()
     try:
         response = requests.request(
             method,
-            f"{_BASE_URL}{path}",
+            f"{base_url}{path}",
             headers={**_headers(), **({"Content-Type": "application/json"} if payload is not None else {})},
             json=payload,
             timeout=_TIMEOUT,
@@ -54,15 +59,16 @@ def _forward(method: str, path: str, payload=None):
 
 @open_notebook_bp.get("/status")
 def status():
+    base_url, public_url, _ = _settings()
     try:
-        response = requests.get(f"{_BASE_URL}/health", headers=_headers(), timeout=4)
+        response = requests.get(f"{base_url}/health", headers=_headers(), timeout=4)
         return jsonify({
             "available": response.ok,
-            "public_url": _PUBLIC_URL,
+            "public_url": public_url,
             "service": response.json() if response.ok else {},
         }), 200
     except (requests.RequestException, ValueError):
-        return jsonify({"available": False, "public_url": _PUBLIC_URL, "service": {}}), 200
+        return jsonify({"available": False, "public_url": public_url, "service": {}}), 200
 
 
 @open_notebook_bp.get("/notebooks")
@@ -73,7 +79,8 @@ def list_notebooks():
 @open_notebook_bp.get("/access")
 def access():
     """Return the studio password only to an authenticated OrganAIzer user."""
-    return jsonify({"configured": bool(_PASSWORD), "password": _PASSWORD})
+    _, _, password = _settings()
+    return jsonify({"configured": bool(password), "password": password})
 
 
 @open_notebook_bp.post("/notebooks")

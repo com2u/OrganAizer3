@@ -798,6 +798,55 @@ export async function deleteVerbindung(id: number): Promise<void> {
   if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || 'Failed to delete connection') }
 }
 
+export type IntegrationKey = 'open_notebook' | 'slidev'
+export interface IntegrationCapability {
+  added: boolean
+  configured: boolean
+  public_url: string
+}
+export type IntegrationCapabilities = Record<'open_notebook' | 'slidev' | 'n8n', IntegrationCapability>
+
+export async function fetchIntegrationCapabilities(): Promise<IntegrationCapabilities> {
+  const res = await apiFetch('/verbindungen/capabilities')
+  if (!res.ok) throw new Error('Integrationen konnten nicht geladen werden')
+  return res.json()
+}
+
+export async function fetchIntegrationConfig(key: IntegrationKey): Promise<Record<string, string | boolean>> {
+  const res = await apiFetch(`/verbindungen/integrations/${key}`)
+  if (!res.ok) throw new Error('Konfiguration konnte nicht geladen werden')
+  return res.json()
+}
+
+export async function saveIntegrationConfig(key: IntegrationKey, config: Record<string, string | boolean>): Promise<Record<string, string | boolean>> {
+  const res = await apiFetch(`/verbindungen/integrations/${key}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Konfiguration konnte nicht gespeichert werden')
+  return data
+}
+
+export async function fetchSlidevProject(): Promise<{ content: string }> {
+  const res = await apiFetch('/slidev/project')
+  if (!res.ok) throw new Error('Slidev-Projekt konnte nicht geladen werden')
+  return res.json()
+}
+
+export async function saveSlidevProject(content: string): Promise<void> {
+  const res = await apiFetch('/slidev/project', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.error || 'Slidev-Projekt konnte nicht gespeichert werden')
+  }
+}
+
 // ===== n8n Integration =====
 
 export interface N8nConfig {

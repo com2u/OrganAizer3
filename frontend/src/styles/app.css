@@ -4820,6 +4820,17 @@ button { font-family: inherit; }
 }
 
 /* ===== Verbindungen View ===== */
+.integration-config-modal { width: min(680px, calc(100vw - 32px)); }
+.integration-config-modal .form-grid { display: grid; gap: 14px; }
+.checkbox-field { flex-direction: row !important; align-items: center; gap: 8px; }
+.slidev-workspace, .embedded-app-shell { min-height: 640px; display: flex; flex-direction: column; gap: 12px; }
+.slidev-toolbar, .embedded-app-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.slidev-toolbar .segmented { display: flex; padding: 3px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+.slidev-toolbar .segmented button { border: 0; background: transparent; color: var(--text-muted); padding: 8px 12px; border-radius: 7px; }
+.slidev-toolbar .segmented button.active { background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm); }
+.slidev-frame, .embedded-app-frame { width: 100%; min-height: 650px; flex: 1; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
+.embedded-app-toolbar > div { display: flex; flex-direction: column; gap: 2px; }
+.embedded-app-toolbar small, .slidev-message { color: var(--text-muted); }
 /* Uses standard .view + .view-header layout like Ressourcen, Wissen, etc. */
 .verbindungen-view { overflow: hidden; }
 .verbindungen-body { flex: 1; overflow: auto; padding: 24px 28px; max-width: 1040px; }

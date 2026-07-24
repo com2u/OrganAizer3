@@ -78,9 +78,11 @@ services:
     image: surrealdb/surrealdb:v2
     container_name: organaizer-open-notebook-db
     restart: unless-stopped
+    env_file:
+      - ./data/integrations/open-notebook.env
     user: root
     command:
-      ["start", "--log", "info", "--user", "${OPEN_NOTEBOOK_DB_USER:-root}", "--pass", "${OPEN_NOTEBOOK_DB_PASSWORD:-root}", "rocksdb:/mydata/mydatabase.db"]
+      ["start", "--log", "info", "rocksdb:/mydata/mydatabase.db"]
     environment:
       SURREAL_EXPERIMENTAL_GRAPHQL: "true"
     volumes:
@@ -92,15 +94,13 @@ services:
     restart: unless-stopped
     depends_on:
       - open-notebook-db
+    env_file:
+      - ./data/integrations/open-notebook.env
     environment:
-      OPEN_NOTEBOOK_ENCRYPTION_KEY: ${OPEN_NOTEBOOK_ENCRYPTION_KEY:-change-this-in-production}
       # Public entry is protected by the dedicated reverse proxy and can only
       # be initiated from the authenticated OrganAIzer iframe.
-      OPEN_NOTEBOOK_PASSWORD: ${OPEN_NOTEBOOK_PASSWORD:-}
       API_URL: https://open-notebook.ai-server.org
       SURREAL_URL: ws://open-notebook-db:8000/rpc
-      SURREAL_USER: ${OPEN_NOTEBOOK_DB_USER:-root}
-      SURREAL_PASSWORD: ${OPEN_NOTEBOOK_DB_PASSWORD:-root}
       SURREAL_NAMESPACE: open_notebook
       SURREAL_DATABASE: open_notebook
     volumes:
@@ -108,6 +108,18 @@ services:
     ports:
       - "127.0.0.1:${OPEN_NOTEBOOK_UI_PORT:-8502}:8502"
       - "127.0.0.1:${OPEN_NOTEBOOK_API_PORT:-5055}:5055"
+
+  # ===== Slidev – Markdown presentations =====
+  slidev:
+    build:
+      context: ./slidev
+    image: organaizer-slidev:latest
+    container_name: organaizer-slidev
+    restart: unless-stopped
+    volumes:
+      - ./data/slidev:/slides
+    ports:
+      - "127.0.0.1:${SLIDEV_PORT:-3030}:3030"
 
 
   # ===== n8n – Workflow Automation =====
@@ -120,18 +132,19 @@ services:
     environment:
       # Run in "public" mode so the editor is accessible without signup
       - N8N_RUNNERS_ENABLED=true
-      - N8N_HOST=n8n
+      - N8N_HOST=open-notebook.ai-server.org
       - N8N_PORT=5678
-      - N8N_PROTOCOL=http
-      - WEBHOOK_URL=http://localhost:5678/
+      - N8N_PROTOCOL=https
+      - N8N_PATH=/n8n/
+      - WEBHOOK_URL=https://open-notebook.ai-server.org/n8n/
       # Allow iframe embedding from OrganAIzer
       - N8N_SECURE_COOKIE=false
-      - N8N_EDITOR_BASE_URL=http://localhost:5678
+      - N8N_EDITOR_BASE_URL=https://open-notebook.ai-server.org/n8n/
       - N8N_DIAGNOSTICS_ENABLED=false
       - N8N_PERSONALIZATION_ENABLED=false
       - N8N_TEMPLATES_ENABLED=false
     ports:
-      - "5678:5678"
+      - "127.0.0.1:5678:5678"
     volumes:
       # Persist n8n workflows and credentials on the host
       - ./n8n_data:/home/node/.n8n

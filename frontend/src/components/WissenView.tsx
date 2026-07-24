@@ -5,6 +5,7 @@ import {
   Search, Clock, Tag, Loader2, FolderOpen, ChevronRight, ChevronDown,
   File, Folder, RefreshCw, Save, AlertTriangle, ArrowUpDown, ArrowUp, ArrowDown,
   LibraryBig, Plus, ExternalLink, ShieldCheck, Sparkles, KeyRound, Check,
+  Presentation, Maximize2,
 } from 'lucide-react'
 import {
   fetchObsidianTree, searchObsidian, fetchObsidianTags, fetchObsidianRecent,
@@ -13,9 +14,10 @@ import {
   ObsidianSearchResult, ObsidianTag, ObsidianNote,
   fetchOpenNotebookStatus, fetchOpenNotebookAccess, fetchResearchNotebooks, createResearchNotebook,
   OpenNotebookStatus, ResearchNotebook,
+  fetchIntegrationCapabilities, IntegrationCapabilities, fetchSlidevProject, saveSlidevProject,
 } from '../api'
 
-type Tab = 'search' | 'navigation' | 'tags' | 'recent' | 'research'
+type Tab = 'search' | 'navigation' | 'tags' | 'recent' | 'research' | 'slidev'
 
 // ── Editor ────────────────────────────────────────────────────────────────────
 
@@ -742,10 +744,47 @@ function ResearchNotebooksTab() {
 
 // ── Main WissenView ───────────────────────────────────────────────────────────
 
+function SlidevTab({ publicUrl }: { publicUrl: string }) {
+  const { theme } = useTheme()
+  const [mode, setMode] = useState<'editor' | 'presentation'>('editor')
+  const [content, setContent] = useState('')
+  const [message, setMessage] = useState('')
+  const frame = useCallback((node: HTMLIFrameElement | null) => { (window as unknown as { __slidevFrame?: HTMLIFrameElement }).__slidevFrame = node || undefined }, [])
+  useEffect(() => {
+    fetchSlidevProject().then(r => setContent(r.content)).catch(e => setMessage(e.message))
+  }, [])
+  const save = async () => {
+    setMessage('Speichert…')
+    try { await saveSlidevProject(content); setMessage('Gespeichert. Slidev lädt die Präsentation automatisch neu.') }
+    catch (e) { setMessage(e instanceof Error ? e.message : String(e)) }
+  }
+  const fullscreen = () => {
+    const el = (window as unknown as { __slidevFrame?: HTMLIFrameElement }).__slidevFrame
+    el?.requestFullscreen?.()
+  }
+  return <div className="slidev-workspace">
+    <div className="slidev-toolbar">
+      <div className="segmented"><button className={mode === 'editor' ? 'active' : ''} onClick={() => setMode('editor')}>Markdown bearbeiten</button><button className={mode === 'presentation' ? 'active' : ''} onClick={() => setMode('presentation')}>Präsentation</button></div>
+      {mode === 'editor' ? <button className="primary-btn" onClick={save}><Save size={15} /> Speichern</button> : <><a className="secondary-btn" href={publicUrl} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Neues Fenster</a><button className="primary-btn" onClick={fullscreen}><Maximize2 size={15} /> Vollbild</button></>}
+    </div>
+    {message && <p className="slidev-message">{message}</p>}
+    {mode === 'presentation' && <p className="slidev-message">Geschützter Präsentationszugang: Benutzer <strong>organaizer</strong>, Passwort ist der Open-Notebook-Zugangsschlüssel.</p>}
+    {mode === 'editor'
+      ? <div data-color-mode={theme === 'dark' ? 'dark' : 'light'}><MDEditor value={content} onChange={v => setContent(v || '')} height={620} preview="live" /></div>
+      : <iframe ref={frame} className="slidev-frame" src={publicUrl} title="Slidev Präsentation" allow="fullscreen" />}
+  </div>
+}
+
 export default function WissenView() {
   const { t } = useTheme()
   const [activeTab, setActiveTab] = useState<Tab>('navigation')
   const [floatingNote, setFloatingNote] = useState<string | null>(null)
+  const [capabilities, setCapabilities] = useState<IntegrationCapabilities | null>(null)
+  useEffect(() => { fetchIntegrationCapabilities().then(setCapabilities).catch(() => setCapabilities(null)) }, [])
+  useEffect(() => {
+    if (activeTab === 'research' && !capabilities?.open_notebook.configured) setActiveTab('navigation')
+    if (activeTab === 'slidev' && !capabilities?.slidev.configured) setActiveTab('navigation')
+  }, [activeTab, capabilities])
 
   const openNote = (path: string) => {
     // If on Navigation tab, switch to it - otherwise open floating editor
@@ -779,9 +818,12 @@ export default function WissenView() {
         <button className={`tab-btn${activeTab === 'recent' ? ' active' : ''}`} onClick={() => setActiveTab('recent')}>
           <Clock size={14} /> {t('wissen.recent')}
         </button>
-        <button className={`tab-btn${activeTab === 'research' ? ' active' : ''}`} onClick={() => setActiveTab('research')}>
+        {capabilities?.open_notebook.configured && <button className={`tab-btn${activeTab === 'research' ? ' active' : ''}`} onClick={() => setActiveTab('research')}>
           <LibraryBig size={14} /> {t('wissen.research')}
-        </button>
+        </button>}
+        {capabilities?.slidev.configured && <button className={`tab-btn${activeTab === 'slidev' ? ' active' : ''}`} onClick={() => setActiveTab('slidev')}>
+          <Presentation size={14} /> Präsentationen
+        </button>}
       </div>
 
       <div className="wissen-tab-content">
@@ -790,6 +832,7 @@ export default function WissenView() {
         {activeTab === 'tags' && <TagsTab onOpenNote={openNote} />}
         {activeTab === 'recent' && <RecentTab onOpenNote={openNote} />}
         {activeTab === 'research' && <ResearchNotebooksTab />}
+        {activeTab === 'slidev' && <SlidevTab publicUrl={capabilities?.slidev.public_url || ''} />}
       </div>
 
       {floatingNote && (

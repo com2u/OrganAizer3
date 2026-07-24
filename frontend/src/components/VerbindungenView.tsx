@@ -14,6 +14,8 @@ import {
   Ticket,
   BookMarked,
   Workflow,
+  LibraryBig,
+  Presentation,
   Cpu,
   Building2,
   Fingerprint,
@@ -41,6 +43,9 @@ import {
   N8nConfig,
   N8nConfigInput,
   N8nWorkflow,
+  fetchIntegrationConfig,
+  saveIntegrationConfig,
+  IntegrationKey,
 } from '../api'
 import { useTheme } from '../ThemeContext'
 
@@ -73,6 +78,8 @@ const TEMPLATES: TemplateDef[] = [
   { key: 'sap',               labelKey: 'vb.tpl.sap',               descKey: 'vb.tpl.sap.desc',               icon: Building2 },
   { key: 'interflex',         labelKey: 'vb.tpl.interflex',         descKey: 'vb.tpl.interflex.desc',         icon: Fingerprint,  weight: 'wide' },
   { key: 'n8n',               labelKey: 'vb.tpl.n8n',              descKey: 'vb.tpl.n8n.desc',               icon: Workflow,    weight: 'wide' },
+  { key: 'open_notebook',     labelKey: 'vb.tpl.openNotebook',     descKey: 'vb.tpl.openNotebook.desc',      icon: LibraryBig,  weight: 'wide' },
+  { key: 'slidev',            labelKey: 'vb.tpl.slidev',           descKey: 'vb.tpl.slidev.desc',            icon: Presentation, weight: 'wide' },
   { key: 'mcp',               labelKey: 'vb.tpl.mcp',              descKey: 'vb.tpl.mcp.desc',               icon: Cpu },
 ]
 
@@ -125,6 +132,9 @@ export default function VerbindungenView() {
 
   // n8n iframe load state
   const [iframeLoaded, setIframeLoaded] = useState(false)
+  const [integrationKey, setIntegrationKey] = useState<IntegrationKey | null>(null)
+  const [integrationForm, setIntegrationForm] = useState<Record<string, string | boolean>>({})
+  const [integrationSaving, setIntegrationSaving] = useState(false)
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
   const load = () => {
@@ -137,6 +147,37 @@ export default function VerbindungenView() {
   }
 
   useEffect(() => { load() }, [])
+
+  const openIntegrationConfig = async (key: IntegrationKey) => {
+    setIntegrationKey(key)
+    setSaveError(null)
+    try {
+      const cfg = await fetchIntegrationConfig(key)
+      setIntegrationForm({
+        enabled: cfg.enabled ?? true,
+        public_url: String(cfg.public_url || (key === 'slidev' ? 'https://open-notebook.ai-server.org/slidev/' : 'https://open-notebook.ai-server.org')),
+        api_url: String(cfg.api_url || 'http://open-notebook:5055'),
+        project_name: String(cfg.project_name || 'OrganAIzer Präsentation'),
+      })
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  const saveLocalIntegration = async () => {
+    if (!integrationKey) return
+    setIntegrationSaving(true)
+    setSaveError(null)
+    try {
+      await saveIntegrationConfig(integrationKey, integrationForm)
+      setIntegrationKey(null)
+      load()
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setIntegrationSaving(false)
+    }
+  }
 
   // n8n: Load config when an n8n connection is selected
   const loadN8nConfig = () => {
@@ -338,6 +379,7 @@ export default function VerbindungenView() {
               const tpl = TEMPLATES.find(t => t.key === conn.template_key)
               const Icon = tpl?.icon ?? Plug
               const isN8n = conn.template_key === 'n8n'
+              const isLocalIntegration = conn.template_key === 'open_notebook' || conn.template_key === 'slidev'
               const isSelected = selectedN8nConnection?.id === conn.id
               return (
                 <div 
@@ -363,6 +405,11 @@ export default function VerbindungenView() {
                       title={t('n8n.tab.editor')}
                     >
                       <Workflow size={14} /> {t('n8n.tab.editor')}
+                    </button>
+                  )}
+                  {isLocalIntegration && (
+                    <button type="button" className="btn btn-sm btn-primary" onClick={() => openIntegrationConfig(conn.template_key as IntegrationKey)}>
+                      <Settings size={14} /> Konfigurieren
                     </button>
                   )}
                   {deleteConfirm === conn.id ? (
@@ -742,6 +789,41 @@ export default function VerbindungenView() {
                 {saving ? t('vb.dialog.saving') : t('vb.dialog.save')}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {integrationKey && (
+        <div className="modal-overlay" onMouseDown={e => { if (e.target === e.currentTarget) setIntegrationKey(null) }}>
+          <div className="modal-card integration-config-modal" role="dialog" aria-modal="true">
+            <div className="modal-header">
+              <div><h3>{integrationKey === 'slidev' ? 'Slidev' : 'Open Notebook'} konfigurieren</h3><p>Lokale, persistente Integrationskonfiguration</p></div>
+              <button className="icon-btn" onClick={() => setIntegrationKey(null)}><X size={18} /></button>
+            </div>
+            <div className="modal-body form-grid">
+              <label className="form-field">Öffentliche URL
+                <input value={String(integrationForm.public_url || '')} onChange={e => setIntegrationForm(v => ({ ...v, public_url: e.target.value }))} />
+              </label>
+              {integrationKey === 'open_notebook' && <>
+                <label className="form-field">Interne API-URL
+                  <input value={String(integrationForm.api_url || '')} onChange={e => setIntegrationForm(v => ({ ...v, api_url: e.target.value }))} />
+                </label>
+                <label className="form-field">Zugangsschlüssel
+                  <input type="password" placeholder="Unverändert lassen" onChange={e => setIntegrationForm(v => ({ ...v, password: e.target.value }))} />
+                </label>
+                <label className="form-field">Verschlüsselungsschlüssel
+                  <input type="password" placeholder="Unverändert lassen" onChange={e => setIntegrationForm(v => ({ ...v, encryption_key: e.target.value }))} />
+                </label>
+                <label className="form-field">Datenbank-Passwort
+                  <input type="password" placeholder="Unverändert lassen" onChange={e => setIntegrationForm(v => ({ ...v, db_password: e.target.value }))} />
+                </label>
+              </>}
+              {integrationKey === 'slidev' && <label className="form-field">Projektname
+                <input value={String(integrationForm.project_name || '')} onChange={e => setIntegrationForm(v => ({ ...v, project_name: e.target.value }))} />
+              </label>}
+              <label className="form-field checkbox-field"><input type="checkbox" checked={Boolean(integrationForm.enabled)} onChange={e => setIntegrationForm(v => ({ ...v, enabled: e.target.checked }))} /> Integration aktiv</label>
+              {saveError && <div className="vb-error">{saveError}</div>}
+            </div>
+            <div className="modal-actions"><button className="btn" onClick={() => setIntegrationKey(null)}>Abbrechen</button><button className="btn btn-primary" disabled={integrationSaving} onClick={saveLocalIntegration}>{integrationSaving ? 'Speichert…' : 'Speichern'}</button></div>
           </div>
         </div>
       )}

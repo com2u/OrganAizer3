@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import BildGeneratorView from './BildGeneratorView'
 import { useTheme } from '../ThemeContext'
-import { CheckSquare, Search, Sparkles, ArrowLeft, ArrowRight, Play, CircleDot, Download, FileText, Loader2, Copy, Check, X, Globe, Link, Clipboard } from 'lucide-react'
-import { hermesExecute, getToken } from '../api'
+import { CheckSquare, Search, Sparkles, ArrowLeft, ArrowRight, Play, CircleDot, Download, FileText, Loader2, Copy, Check, X, Globe, Link, Clipboard, ExternalLink } from 'lucide-react'
+import { hermesExecute, getToken, fetchIntegrationCapabilities, IntegrationCapabilities } from '../api'
 import MDEditor from '@uiw/react-md-editor'
 
 // API_BASE matches the value from api.ts (VITE_API_BASE or '/api')
@@ -84,12 +84,15 @@ const TOOL_CARDS: { key: ToolKey; icon: typeof CheckSquare; titleKey: string; de
 
 export default function AufgabenView() {
   const { t, theme } = useTheme()
-  const [activeTab, setActiveTab] = useState<'overview' | 'executed'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'executed' | 'n8n'>('overview')
+  const [capabilities, setCapabilities] = useState<IntegrationCapabilities | null>(null)
   const [selectedTool, setSelectedTool] = useState<ToolKey>('overview')
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null)
   const [formData, setFormData] = useState<Record<string, string>>({})
   const [executedTasks, setExecutedTasks] = useState<{ id: string; name: string; date: string; status: string }[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
+  useEffect(() => { fetchIntegrationCapabilities().then(setCapabilities).catch(() => setCapabilities(null)) }, [])
+  useEffect(() => { if (activeTab === 'n8n' && !capabilities?.n8n.configured) setActiveTab('overview') }, [activeTab, capabilities])
 
   // Abort controllers
   const ytAbortRef = useRef<AbortController | null>(null)
@@ -613,6 +616,7 @@ export default function AufgabenView() {
       <div className="aufgaben-tabs">
         <button className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`} onClick={() => { setActiveTab('overview'); selectTool('overview') }}>{t('aufgaben.overview')}</button>
         <button className={`tab-btn ${activeTab === 'executed' ? 'active' : ''}`} onClick={() => { setActiveTab('executed'); loadHistory() }}>{t('aufgaben.executed')} <span className="tab-count">{executedTasks.length}</span></button>
+        {capabilities?.n8n.configured && <button className={`tab-btn ${activeTab === 'n8n' ? 'active' : ''}`} onClick={() => setActiveTab('n8n')}><Globe size={14} /> n8n</button>}
       </div>
 
       {activeTab === 'overview' && selectedTool === 'overview' && (
@@ -709,6 +713,12 @@ export default function AufgabenView() {
               <tbody>{executedTasks.map(task => <tr key={task.id}><td>{task.name}</td><td>{new Date(task.date).toLocaleString('de-DE')}</td><td><span className="status-pill">{task.status}</span></td></tr>)}</tbody>
             </table>
           )}
+        </div>
+      )}
+      {activeTab === 'n8n' && capabilities?.n8n.configured && (
+        <div className="embedded-app-shell">
+          <div className="embedded-app-toolbar"><div><strong>n8n Workflow Automation</strong><small>Workflows direkt in OrganAIzer verwalten</small></div><a className="secondary-btn" href={capabilities.n8n.public_url} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Neues Fenster</a></div>
+          <iframe className="embedded-app-frame" src={capabilities.n8n.public_url} title="n8n" allow="clipboard-read; clipboard-write" />
         </div>
       )}
     </section>

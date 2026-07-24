@@ -8,7 +8,7 @@
 
 ---
 
-## Version: 0.1.16 (July 2026)
+## Version: 0.1.17 (July 2026)
 
 ### Research notebooks (Open Notebook)
 
@@ -24,16 +24,24 @@ preserved by `upload_backend.sh`. The browser never receives the internal API
 address or password; native requests pass through the authenticated
 `/api/open-notebook/*` bridge.
 
-Production should define `OPEN_NOTEBOOK_ENCRYPTION_KEY`,
-`OPEN_NOTEBOOK_PASSWORD`, and `OPEN_NOTEBOOK_DB_PASSWORD` in `.env`.
-`OPEN_NOTEBOOK_PUBLIC_URL` is optional and enables the full studio link when
-the UI is published behind an HTTPS reverse proxy.
+Open Notebook is added and configured under **External connections**. Its
+secrets are stored in the protected persistent `data/integrations/` directory,
+not the root `.env`. Only a configured connection exposes the workspace tab.
 
 Version 0.1.16 embeds the complete original Open Notebook studio through
 `https://open-notebook.ai-server.org`. Collections, multimodal sources,
 research chat, transformations, notes, model configuration, and podcast
 generation are therefore available without reducing the feature set to the
 small native overview. The overview remains available as a secondary tab.
+
+Configured n8n and Slidev connections likewise expose optional workspaces:
+**Tasks → n8n** embeds workflow automation; **Knowledge → Presentations**
+provides a Markdown editor, live Slidev presentation, external launch and
+fullscreen mode.
+
+The public Slidev route is protected with HTTP Basic Authentication (user
+`organaizer`, password: the locally configured Open Notebook access key). n8n
+retains its own login. Both direct container ports bind to localhost only.
 
 ## Feature Overview
 

@@ -1,9 +1,4 @@
-"""REST API routes for integration connections (Verbindungen).
-
-Manages metadata for prepared integration templates.
-No actual OAuth/API connectivity is implemented here – status is always 'prepared'.
-No secrets, tokens, passwords, or API keys are ever stored or returned.
-"""
+"""REST API routes and local configuration for external integrations."""
 
 import logging
 
@@ -12,6 +7,7 @@ from flask import Blueprint, jsonify, request
 from backend import auth
 from backend.db.factory import get_database
 from backend.db.interface import DatabaseInterface
+from backend.integration_config import is_configured, public_config, write_config
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +38,8 @@ VALID_TEMPLATE_KEYS = (
     "sap",
     "interflex",
     "n8n",
+    "open_notebook",
+    "slidev",
     "mcp",
 )
 
@@ -76,6 +74,58 @@ def list_verbindungen():
         return jsonify([_row_to_dict(r) for r in rows])
     finally:
         db.disconnect()
+
+
+@verbindungen_bp.get("/capabilities")
+def capabilities():
+    """Navigation capabilities; never includes integration secrets."""
+    db = _get_db()
+    try:
+        rows = db.fetchall("SELECT DISTINCT template_key FROM verbindungen")
+        added = {r["template_key"] for r in rows}
+        result = {}
+        for key in ("open_notebook", "slidev"):
+            cfg = public_config(key)
+            result[key] = {
+                "added": key in added,
+                "configured": key in added and is_configured(key),
+                "public_url": cfg.get("public_url", ""),
+            }
+        n8n = db.fetchone("SELECT base_url, aktiv FROM n8n_config WHERE id = 1")
+        result["n8n"] = {
+            "added": "n8n" in added,
+            "configured": "n8n" in added and bool(n8n and n8n.get("aktiv") and n8n.get("base_url")),
+            "public_url": n8n.get("base_url", "") if n8n else "",
+        }
+        return jsonify(result)
+    finally:
+        db.disconnect()
+
+
+@verbindungen_bp.route("/integrations/<key>", methods=["GET", "PUT"])
+def integration_settings(key: str):
+    if key not in ("open_notebook", "slidev"):
+        return jsonify({"error": "Diese Integration wird hier nicht konfiguriert."}), 404
+    if request.method == "GET":
+        return jsonify(public_config(key))
+    data = request.get_json(silent=True) or {}
+    allowed = {
+        "open_notebook": {"enabled", "public_url", "api_url", "encryption_key", "password", "db_password"},
+        "slidev": {"enabled", "public_url", "project_name"},
+    }[key]
+    clean = {k: v.strip() if isinstance(v, str) else v for k, v in data.items() if k in allowed}
+    if "public_url" in clean and clean["public_url"] and not clean["public_url"].startswith(("http://", "https://")):
+        return jsonify({"error": "Die öffentliche URL muss mit http:// oder https:// beginnen."}), 400
+    result = write_config(key, clean)
+    db = _get_db()
+    try:
+        db.execute(
+            "UPDATE verbindungen SET status = ? WHERE template_key = ?",
+            ("configured" if is_configured(key) else "prepared", key),
+        )
+    finally:
+        db.disconnect()
+    return jsonify(result)
 
 
 @verbindungen_bp.route("", methods=["POST"])

@@ -1004,6 +1004,10 @@ const T: Translations = {
   'vb.tpl.interflex.desc': { de: 'Zeiterfassung anbinden', en: 'Connect time tracking' },
   'vb.tpl.n8n': { de: 'n8n', en: 'n8n' },
   'vb.tpl.n8n.desc': { de: 'Workflows automatisieren', en: 'Automate workflows' },
+  'vb.tpl.openNotebook': { de: 'Open Notebook', en: 'Open Notebook' },
+  'vb.tpl.openNotebook.desc': { de: 'Recherche, Sammlungen und Podcasts', en: 'Research, collections and podcasts' },
+  'vb.tpl.slidev': { de: 'Slidev', en: 'Slidev' },
+  'vb.tpl.slidev.desc': { de: 'Markdown-Präsentationen erstellen', en: 'Create Markdown presentations' },
   'vb.tpl.mcp': { de: 'MCP', en: 'MCP' },
   'vb.tpl.mcp.desc': { de: 'Model Context Protocol', en: 'Model Context Protocol' },
 

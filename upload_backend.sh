@@ -100,15 +100,43 @@ echo "Upload complete."
 echo "Building and starting the Docker container on the server..."
 $SSH "set -e
 cd $REMOTE_DIR
-# Generate Open Notebook secrets once. Existing values are never replaced.
-grep -q '^OPEN_NOTEBOOK_ENCRYPTION_KEY=' .env || echo \"OPEN_NOTEBOOK_ENCRYPTION_KEY=\$(openssl rand -hex 32)\" >> .env
-grep -q '^OPEN_NOTEBOOK_PASSWORD=' .env || echo \"OPEN_NOTEBOOK_PASSWORD=\$(openssl rand -hex 24)\" >> .env
-grep -q '^OPEN_NOTEBOOK_DB_PASSWORD=' .env || echo \"OPEN_NOTEBOOK_DB_PASSWORD=\$(openssl rand -hex 24)\" >> .env
-docker compose up -d --build
+# Migrate legacy Open Notebook values from the root .env into its private,
+# persisted integration configuration. The root .env no longer owns them.
+mkdir -p data/integrations data/slidev
+ON_ENC=\$(sed -n 's/^OPEN_NOTEBOOK_ENCRYPTION_KEY=//p' .env | tail -1)
+ON_PASS=\$(sed -n 's/^OPEN_NOTEBOOK_PASSWORD=//p' .env | tail -1)
+ON_DB=\$(sed -n 's/^OPEN_NOTEBOOK_DB_PASSWORD=//p' .env | tail -1)
+[ -n \"\$ON_ENC\" ] || ON_ENC=\$(sed -n 's/^OPEN_NOTEBOOK_ENCRYPTION_KEY=//p' data/integrations/open-notebook.env 2>/dev/null | tail -1)
+[ -n \"\$ON_PASS\" ] || ON_PASS=\$(sed -n 's/^OPEN_NOTEBOOK_PASSWORD=//p' data/integrations/open-notebook.env 2>/dev/null | tail -1)
+[ -n \"\$ON_DB\" ] || ON_DB=\$(sed -n 's/^OPEN_NOTEBOOK_DB_PASSWORD=//p' data/integrations/open-notebook.env 2>/dev/null | tail -1)
+[ -n \"\$ON_ENC\" ] || ON_ENC=\$(openssl rand -hex 32)
+[ -n \"\$ON_PASS\" ] || ON_PASS=\$(openssl rand -hex 24)
+[ -n \"\$ON_DB\" ] || ON_DB=\$(openssl rand -hex 24)
+export ON_ENC ON_PASS ON_DB
+printf 'OPEN_NOTEBOOK_ENCRYPTION_KEY=%s\nOPEN_NOTEBOOK_PASSWORD=%s\nOPEN_NOTEBOOK_DB_PASSWORD=%s\nOPEN_NOTEBOOK_DB_USER=root\nSURREAL_USER=root\nSURREAL_PASS=%s\nSURREAL_PASSWORD=%s\n' \"\$ON_ENC\" \"\$ON_PASS\" \"\$ON_DB\" \"\$ON_DB\" \"\$ON_DB\" > data/integrations/open-notebook.env
+chmod 600 data/integrations/open-notebook.env
+python3 -c 'import json,os; p=\"data/integrations/open_notebook.json\"; old=json.load(open(p)) if os.path.exists(p) else {}; old.update({\"enabled\":True,\"public_url\":\"https://open-notebook.ai-server.org\",\"api_url\":\"http://open-notebook:5055\",\"encryption_key\":os.environ[\"ON_ENC\"],\"password\":os.environ[\"ON_PASS\"],\"db_password\":os.environ[\"ON_DB\"]}); open(p,\"w\").write(json.dumps(old,indent=2)+\"\\n\")'
+chmod 600 data/integrations/open_notebook.json
+python3 -c 'import json,os; p=\"data/integrations/slidev.json\"; old=json.load(open(p)) if os.path.exists(p) else {}; old.update({\"enabled\":True,\"public_url\":\"https://open-notebook.ai-server.org/slidev/\",\"project_name\":old.get(\"project_name\",\"OrganAIzer Präsentation\")}); open(p,\"w\").write(json.dumps(old,ensure_ascii=False,indent=2)+\"\\n\")'
+chmod 600 data/integrations/slidev.json
+sed -i '/^OPEN_NOTEBOOK_ENCRYPTION_KEY=/d;/^OPEN_NOTEBOOK_PASSWORD=/d;/^OPEN_NOTEBOOK_DB_PASSWORD=/d' .env
+[ -f data/slidev/slides.md ] || printf '%s\n' '---' 'theme: default' 'title: OrganAIzer Präsentation' '---' '' '# OrganAIzer Präsentation' '' 'Mit Markdown und Slidev erstellt.' > data/slidev/slides.md
+# This host also runs the voice and research stack. Sequential builds avoid
+# memory pressure from building the React and Slidev images at the same time.
+COMPOSE_PARALLEL_LIMIT=1 docker compose build
+docker compose up -d --no-build
 # Keep the existing Nginx Proxy Manager connected to the private stack so the
 # Open Notebook HTTPS host can reach UI and API without publishing host ports.
 if docker container inspect nginxreverse-app-1 >/dev/null 2>&1; then
     docker network connect terminlandschaft_default nginxreverse-app-1 2>/dev/null || true
+    docker exec nginxreverse-app-1 mkdir -p /data/nginx/custom
+    docker cp deploy/nginx/open-notebook-workspaces.conf nginxreverse-app-1:/data/nginx/custom/open-notebook-workspaces.conf
+    PROXY_CONF=\$(docker exec nginxreverse-app-1 sh -c 'grep -l \"server_name open-notebook.ai-server.org\" /data/nginx/proxy_host/*.conf' | head -1)
+    if [ -n \"\$PROXY_CONF\" ] && ! docker exec nginxreverse-app-1 grep -q 'open-notebook-workspaces.conf' \"\$PROXY_CONF\"; then
+        docker exec nginxreverse-app-1 sed -i '/# Custom/i\\  include /data/nginx/custom/open-notebook-workspaces.conf;' \"\$PROXY_CONF\"
+    fi
+    docker exec nginxreverse-app-1 nginx -t
+    docker exec nginxreverse-app-1 nginx -s reload
 fi
 echo 'Ensuring SIP trunk and dispatch rule exist...'
 docker compose exec -T voice-agent python -m app.setup_sip"

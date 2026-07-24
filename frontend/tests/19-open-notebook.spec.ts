@@ -5,6 +5,11 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/api/auth/me', route => route.fulfill({
     json: { id: 'test', email: 'test@example.org', name: 'Test User', role: 'admin' },
   }))
+  await page.route('**/api/verbindungen/capabilities', route => route.fulfill({ json: {
+    open_notebook: { added: true, configured: true, public_url: 'https://open-notebook.ai-server.org' },
+    slidev: { added: false, configured: false, public_url: '' },
+    n8n: { added: false, configured: false, public_url: '' },
+  } }))
   await page.route('**/api/obsidian/**', route => route.fulfill({ json: { tree: { type: 'directory', name: '', path: '', children: [] }, tags: [], notes: [] } }))
 })
 

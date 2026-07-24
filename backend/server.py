@@ -12,6 +12,7 @@ from backend.api.planning_routes import planning_bp
 from backend.api.ai_connections_routes import ai_connections_bp
 from backend.api.obsidian_routes import obsidian_bp
 from backend.api.open_notebook_routes import open_notebook_bp
+from backend.api.slidev_routes import slidev_bp
 from backend.api.verbindungen_routes import verbindungen_bp
 from backend.api.n8n_routes import n8n_bp
 from backend.api.access_requests_routes import access_requests_bp
@@ -54,6 +55,7 @@ def create_app() -> Flask:
     app.register_blueprint(ai_connections_bp, url_prefix="/api/ai-connections")
     app.register_blueprint(obsidian_bp, url_prefix="/api/obsidian")
     app.register_blueprint(open_notebook_bp, url_prefix="/api/open-notebook")
+    app.register_blueprint(slidev_bp, url_prefix="/api/slidev")
     app.register_blueprint(verbindungen_bp, url_prefix="/api/verbindungen")
     app.register_blueprint(n8n_bp, url_prefix="/api/n8n")
     app.register_blueprint(telephony_bp, url_prefix="/api/telephony")

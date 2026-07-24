@@ -1,5 +1,15 @@
 # Terminlandschaft - Requirements
 
+## Configurable external workspaces (0.1.17)
+
+- Open Notebook, n8n, and Slidev tabs appear only when their external
+  connection exists and is actively configured.
+- Open Notebook credentials persist below `data/integrations/`, are excluded
+  from uploads and Git, and are never returned by configuration APIs.
+- Slidev provides a persistent Markdown editor plus embedded presentation,
+  separate-window, and browser-fullscreen modes.
+- Backend uploads preserve all integration settings and project data.
+
 ## Open Notebook integration (0.1.15)
 
 - Knowledge offers a dedicated, responsive “Research notebooks” tab in German

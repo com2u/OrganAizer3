@@ -1,5 +1,25 @@
 # OrganAIzer architecture
 
+## External workspace capability flow
+
+```mermaid
+flowchart LR
+  EV[External connections] --> CFG[Integration configuration API]
+  CFG --> LOCAL[(data/integrations)]
+  CFG --> META[(Connection metadata)]
+  META --> CAP[Capabilities API]
+  LOCAL --> CAP
+  CAP --> W[Knowledge tabs]
+  CAP --> T[Tasks tabs]
+  W --> ON[Open Notebook]
+  W --> SL[Slidev editor and presentation]
+  T --> N[n8n]
+```
+
+Secrets and Slidev projects live in the persistent `data/` mount.
+`backend/integration_config.py` writes local configuration atomically with
+owner-only permissions and removes secret values from API responses.
+
 ## Open Notebook integration
 
 ```text
@@ -102,7 +122,8 @@ OrganAizer3/
 ├── architecture.md                 # This architecture and repository overview.
 ├── README.md                       # Primary setup, operation, and user documentation.
 ├── Dockerfile                      # Builds the React bundle and Flask production image.
-├── docker-compose.yml              # Defines the application, Supabase, n8n, and complete voice stack.
+├── docker-compose.yml              # Defines the application, Supabase, external workspaces, and voice stack.
+├── slidev/                          # Builds the isolated Slidev presentation service.
 ├── docker-entrypoint.sh            # Starts Flask and performs only the safe SQLite first-run import.
 ├── requirements.txt                # Declares Python dependencies for the main backend.
 ├── schedule.xlsx                   # Supplies the initial schedule for a new SQLite installation.
@@ -119,6 +140,7 @@ OrganAizer3/
 │   ├── server.py                   # Creates Flask, initializes infrastructure, registers routes, and serves the SPA.
 │   ├── main.py                     # Provides command-line schedule import and export operations.
 │   ├── config.py                   # Loads environment variables and resolves runtime paths and service settings.
+│   ├── integration_config.py       # Persists and redacts local external-integration settings.
 │   ├── auth.py                     # Integrates OpenWebUI authentication and protects API requests.
 │   ├── api/
 │   │   ├── __init__.py             # Marks the API route collection as a package.
@@ -130,6 +152,8 @@ OrganAizer3/
 │   │   ├── ai_connections_routes.py # Manages redacted AI-provider connection configurations.
 │   │   ├── verbindungen_routes.py  # Manages general integration connection records.
 │   │   ├── n8n_routes.py           # Manages n8n settings and workflow integration access.
+│   │   ├── open_notebook_routes.py # Bridges authenticated Open Notebook requests.
+│   │   ├── slidev_routes.py        # Loads and saves the persistent Slidev Markdown project.
 │   │   ├── access_requests_routes.py # Accepts rate-limited public access requests.
 │   │   └── logging_middleware.py   # Records structured API request diagnostics.
 │   ├── db/
