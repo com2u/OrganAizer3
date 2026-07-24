@@ -2713,7 +2713,7 @@ button { font-family: inherit; }
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
-.phonebook-notes { resize: vertical; font-family: inherit; }
+.phonebook-notes { resize: vertical; font-family: inherit; min-height: 180px; line-height: 1.5; }
 .phonebook-edit-actions { display: flex; gap: 8px; }
 .phonebook-list {
   display: grid;

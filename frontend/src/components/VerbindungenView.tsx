@@ -17,6 +17,7 @@ import {
   LibraryBig,
   Presentation,
   Clapperboard,
+  PenTool,
   Cpu,
   Building2,
   Fingerprint,
@@ -48,6 +49,7 @@ import {
   saveIntegrationConfig,
   IntegrationKey,
   fetchHyperframesStatus,
+  fetchExcalidrawStatus,
 } from '../api'
 import { useTheme } from '../ThemeContext'
 
@@ -83,6 +85,7 @@ const TEMPLATES: TemplateDef[] = [
   { key: 'open_notebook',     labelKey: 'vb.tpl.openNotebook',     descKey: 'vb.tpl.openNotebook.desc',      icon: LibraryBig,  weight: 'wide' },
   { key: 'slidev',            labelKey: 'vb.tpl.slidev',           descKey: 'vb.tpl.slidev.desc',            icon: Presentation, weight: 'wide' },
   { key: 'hyperframes',       labelKey: 'vb.tpl.hyperframes',      descKey: 'vb.tpl.hyperframes.desc',       icon: Clapperboard, weight: 'wide' },
+  { key: 'excalidraw',        labelKey: 'vb.tpl.excalidraw',       descKey: 'vb.tpl.excalidraw.desc',        icon: PenTool,      weight: 'wide' },
   { key: 'mcp',               labelKey: 'vb.tpl.mcp',              descKey: 'vb.tpl.mcp.desc',               icon: Cpu },
 ]
 
@@ -160,9 +163,10 @@ export default function VerbindungenView() {
       const cfg = await fetchIntegrationConfig(key)
       setIntegrationForm({
         enabled: cfg.enabled ?? true,
-        public_url: String(cfg.public_url || (key === 'slidev' ? 'https://open-notebook.ai-server.org/slidev/' : key === 'hyperframes' ? 'https://hyperframes.ai-server.org' : 'https://open-notebook.ai-server.org')),
+        public_url: String(cfg.public_url || (key === 'slidev' ? 'https://open-notebook.ai-server.org/slidev/' : key === 'hyperframes' ? 'https://hyperframes.ai-server.org' : key === 'excalidraw' ? 'https://excalidraw.ai-server.org' : 'https://open-notebook.ai-server.org')),
         api_url: String(cfg.api_url || 'http://open-notebook:5055'),
         renderer_url: String(cfg.renderer_url || 'http://hyperframes:3002'),
+        app_url: String(cfg.app_url || 'http://excalidraw:80'),
         project_name: String(cfg.project_name || (key === 'hyperframes' ? 'default' : 'OrganAIzer Präsentation')),
       })
     } catch (e) {
@@ -179,6 +183,9 @@ export default function VerbindungenView() {
       if (integrationKey === 'hyperframes') {
         const health = await fetchHyperframesStatus()
         setIntegrationTest(health.available ? `Renderer ${health.version} ist erreichbar.` : 'Konfiguration gespeichert, Renderer ist noch nicht erreichbar.')
+      } else if (integrationKey === 'excalidraw') {
+        const health = await fetchExcalidrawStatus()
+        setIntegrationTest(health.available ? 'Excalidraw ist erreichbar und einsatzbereit.' : 'Konfiguration gespeichert, Excalidraw ist noch nicht erreichbar.')
       } else {
         setIntegrationKey(null)
       }
@@ -390,7 +397,7 @@ export default function VerbindungenView() {
               const tpl = TEMPLATES.find(t => t.key === conn.template_key)
               const Icon = tpl?.icon ?? Plug
               const isN8n = conn.template_key === 'n8n'
-              const isLocalIntegration = conn.template_key === 'open_notebook' || conn.template_key === 'slidev' || conn.template_key === 'hyperframes'
+              const isLocalIntegration = conn.template_key === 'open_notebook' || conn.template_key === 'slidev' || conn.template_key === 'hyperframes' || conn.template_key === 'excalidraw'
               const isSelected = selectedN8nConnection?.id === conn.id
               return (
                 <div 
@@ -807,7 +814,7 @@ export default function VerbindungenView() {
         <div className="resource-modal-layer" onMouseDown={e => { if (e.target === e.currentTarget) setIntegrationKey(null) }}>
           <div className="resource-form card resource-edit-modal integration-config-modal" role="dialog" aria-modal="true">
             <div className="modal-header">
-              <div><h3>{integrationKey === 'slidev' ? 'Slidev' : integrationKey === 'hyperframes' ? 'HyperFrames' : 'Open Notebook'} konfigurieren</h3><p>Lokale, persistente Integrationskonfiguration</p></div>
+              <div><h3>{integrationKey === 'slidev' ? 'Slidev' : integrationKey === 'hyperframes' ? 'HyperFrames' : integrationKey === 'excalidraw' ? 'Excalidraw' : 'Open Notebook'} konfigurieren</h3><p>Lokale, persistente Integrationskonfiguration</p></div>
               <button className="icon-btn" onClick={() => setIntegrationKey(null)}><X size={18} /></button>
             </div>
             <div className="modal-body form-grid">
@@ -840,11 +847,17 @@ export default function VerbindungenView() {
                 </label>
                 <p className="integration-volume-hint">Volumes: /data/hyperframes/projects · /data/hyperframes/assets · /data/hyperframes/output</p>
               </>}
+              {integrationKey === 'excalidraw' && <>
+                <label className="form-field">Interne App-URL
+                  <input value={String(integrationForm.app_url || '')} onChange={e => setIntegrationForm(v => ({ ...v, app_url: e.target.value }))} />
+                </label>
+                <p className="integration-volume-hint">Zeichnungen werden lokal im Browser gespeichert und können als .excalidraw-, PNG- oder SVG-Datei exportiert werden.</p>
+              </>}
               <label className="form-field checkbox-field"><input type="checkbox" checked={Boolean(integrationForm.enabled)} onChange={e => setIntegrationForm(v => ({ ...v, enabled: e.target.checked }))} /> Integration aktiv</label>
               {saveError && <div className="vb-error">{saveError}</div>}
               {integrationTest && <div className="n8n-save-ok"><CheckCircle2 size={16} /> {integrationTest}</div>}
             </div>
-            <div className="modal-actions"><button className="btn" onClick={() => setIntegrationKey(null)}>{integrationTest ? 'Schließen' : 'Abbrechen'}</button><button className="btn btn-primary" disabled={integrationSaving} onClick={saveLocalIntegration}>{integrationSaving ? 'Speichert und prüft…' : integrationKey === 'hyperframes' ? 'Speichern & testen' : 'Speichern'}</button></div>
+            <div className="modal-actions"><button className="btn" onClick={() => setIntegrationKey(null)}>{integrationTest ? 'Schließen' : 'Abbrechen'}</button><button className="btn btn-primary" disabled={integrationSaving} onClick={saveLocalIntegration}>{integrationSaving ? 'Speichert und prüft…' : integrationKey === 'hyperframes' || integrationKey === 'excalidraw' ? 'Speichern & testen' : 'Speichern'}</button></div>
           </div>
         </div>
       )}

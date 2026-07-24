@@ -9,6 +9,7 @@ workspace_auth_bp = Blueprint("workspace_auth", __name__)
 SAFE_NEXT = {
     "slidev": "/slidev/",
     "hyperframes": "/",
+    "excalidraw": "/",
 }
 
 

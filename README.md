@@ -8,7 +8,16 @@
 
 ---
 
-## Version: 0.1.19 (July 2026)
+## Version: 0.1.20 (July 2026)
+
+### Excalidraw whiteboard
+
+A configured Excalidraw connection exposes **Knowledge → Whiteboard**. The
+official self-hosted Excalidraw application runs in its own container and opens
+without another login through OrganAIzer's signed workspace-ticket exchange.
+The embedded workspace supports drawing, diagrams, images, libraries,
+light/dark mode, fullscreen, and `.excalidraw`, PNG and SVG export. Drawings
+are local-first and remain in the browser unless explicitly exported.
 
 ### Slidev presentation workspace
 
@@ -91,6 +100,7 @@ ticket authentication as Slidev. Persistent mounts are
 ### Wissen (Knowledge)
 - Obsidian vault integration: Suche, Navigation (Tree, collapsed by default), Tags, Recently edited.
 - WYSIWYG Markdown-Editor (@uiw/react-md-editor) with toolbar and live preview.
+- Optional Open Notebook, Slidev, HyperFrames and Excalidraw workspaces.
 
 ### Sprache (Speech)
 - TTS (Text vorlesen), STT (Sprache zu Text), Diktieren (microphone recording).

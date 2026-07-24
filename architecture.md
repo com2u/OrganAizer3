@@ -14,6 +14,7 @@ flowchart LR
   W --> ON[Open Notebook]
   W --> SL[Slidev editor and presentation]
   W --> HF[HyperFrames Studio and renderer]
+  W --> EX[Excalidraw whiteboard]
   T --> N[n8n]
 ```
 
@@ -21,7 +22,7 @@ Secrets and Slidev projects live in the persistent `data/` mount.
 `backend/integration_config.py` writes local configuration atomically with
 owner-only permissions and removes secret values from API responses.
 
-Slidev and HyperFrames use the `workspace_auth_routes.py` ticket exchange:
+Slidev, HyperFrames and Excalidraw use the `workspace_auth_routes.py` ticket exchange:
 the authenticated SPA requests a short-lived signed ticket, the external HTTPS
 host exchanges it for an HttpOnly partitioned cookie, and Nginx `auth_request`
 checks that cookie for HTML, assets, and WebSocket upgrades.
@@ -34,6 +35,13 @@ when that pointer changes. Audience and presenter views share the same
 authenticated reverse proxy, with presenter mode routed to
 `/slidev/presenter/`. The API proxy permits request bodies up to 110 MB, while
 the Slidev backend enforces a 100 MB per-file limit.
+
+Excalidraw runs as an isolated official application container. The public
+`excalidraw.ai-server.org` reverse proxy exchanges a short-lived OrganAIzer
+ticket for a partitioned HttpOnly cookie and authorizes all subsequent assets
+through Nginx `auth_request`. The knowledge view checks the backend health
+bridge before embedding the canvas; drawings remain local-first in the browser
+and portable through Excalidraw file exports.
 
 ## Open Notebook integration
 
@@ -172,6 +180,7 @@ OrganAizer3/
 │   │   ├── open_notebook_routes.py # Bridges authenticated Open Notebook requests.
 │   │   ├── slidev_routes.py        # Loads and saves the persistent Slidev Markdown project.
 │   │   ├── hyperframes_routes.py    # Exposes the authenticated renderer readiness check.
+│   │   ├── excalidraw_routes.py     # Exposes the authenticated whiteboard readiness check.
 │   │   ├── workspace_auth_routes.py # Exchanges SPA tickets for secure iframe cookies.
 │   │   ├── access_requests_routes.py # Accepts rate-limited public access requests.
 │   │   └── logging_middleware.py   # Records structured API request diagnostics.

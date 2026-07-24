@@ -798,13 +798,13 @@ export async function deleteVerbindung(id: number): Promise<void> {
   if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || 'Failed to delete connection') }
 }
 
-export type IntegrationKey = 'open_notebook' | 'slidev' | 'hyperframes'
+export type IntegrationKey = 'open_notebook' | 'slidev' | 'hyperframes' | 'excalidraw'
 export interface IntegrationCapability {
   added: boolean
   configured: boolean
   public_url: string
 }
-export type IntegrationCapabilities = Record<'open_notebook' | 'slidev' | 'hyperframes' | 'n8n', IntegrationCapability>
+export type IntegrationCapabilities = Record<'open_notebook' | 'slidev' | 'hyperframes' | 'excalidraw' | 'n8n', IntegrationCapability>
 
 export async function fetchIntegrationCapabilities(): Promise<IntegrationCapabilities> {
   const res = await apiFetch('/verbindungen/capabilities')
@@ -918,7 +918,7 @@ export async function deleteSlidevFile(project: string, path: string): Promise<v
   if (!res.ok) throw new Error(data.error || 'Datei konnte nicht gelöscht werden')
 }
 
-export async function fetchWorkspaceTicket(target: 'slidev' | 'hyperframes'): Promise<string> {
+export async function fetchWorkspaceTicket(target: 'slidev' | 'hyperframes' | 'excalidraw'): Promise<string> {
   const res = await apiFetch(`/workspace-auth/ticket/${target}`)
   const data = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(data.error || 'Workspace-Zugang konnte nicht erstellt werden')
@@ -928,6 +928,12 @@ export async function fetchWorkspaceTicket(target: 'slidev' | 'hyperframes'): Pr
 export async function fetchHyperframesStatus(): Promise<{ available: boolean; version: string }> {
   const res = await apiFetch('/hyperframes/status')
   if (!res.ok) throw new Error('HyperFrames-Status konnte nicht geladen werden')
+  return res.json()
+}
+
+export async function fetchExcalidrawStatus(): Promise<{ available: boolean; storage: string }> {
+  const res = await apiFetch('/excalidraw/status')
+  if (!res.ok) throw new Error('Excalidraw-Status konnte nicht geladen werden')
   return res.json()
 }
 

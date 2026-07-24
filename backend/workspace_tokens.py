@@ -12,7 +12,7 @@ from pathlib import Path
 from backend.integration_config import INTEGRATIONS_DIR
 
 SECRET_PATH = INTEGRATIONS_DIR / ".workspace-embed-secret"
-ALLOWED_TARGETS = {"slidev", "hyperframes"}
+ALLOWED_TARGETS = {"slidev", "hyperframes", "excalidraw"}
 
 
 def _secret() -> bytes:

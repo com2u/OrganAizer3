@@ -5,7 +5,7 @@ import {
   Search, Clock, Tag, Loader2, FolderOpen, ChevronRight, ChevronDown,
   File, Folder, RefreshCw, Save, AlertTriangle, ArrowUpDown, ArrowUp, ArrowDown,
   LibraryBig, Plus, ExternalLink, ShieldCheck, Sparkles, KeyRound, Check,
-  Presentation, Maximize2, Clapperboard, Trash2, Upload, FolderPlus, MonitorPlay,
+  Presentation, Maximize2, Clapperboard, Trash2, Upload, FolderPlus, MonitorPlay, PenTool,
 } from 'lucide-react'
 import {
   fetchObsidianTree, searchObsidian, fetchObsidianTags, fetchObsidianRecent,
@@ -18,10 +18,10 @@ import {
   fetchSlidevProjects, createSlidevProject, deleteSlidevProject, activateSlidevProject,
   fetchSlidevProjectContent, saveSlidevProjectContent, createSlidevFolder, uploadSlidevFile,
   deleteSlidevFile, SlidevFileNode, SlidevProject,
-  fetchWorkspaceTicket, fetchHyperframesStatus,
+  fetchWorkspaceTicket, fetchHyperframesStatus, fetchExcalidrawStatus,
 } from '../api'
 
-type Tab = 'search' | 'navigation' | 'tags' | 'recent' | 'research' | 'slidev' | 'hyperframes'
+type Tab = 'search' | 'navigation' | 'tags' | 'recent' | 'research' | 'slidev' | 'hyperframes' | 'excalidraw'
 
 // ── Editor ────────────────────────────────────────────────────────────────────
 
@@ -949,6 +949,33 @@ function HyperframesTab({ publicUrl }: { publicUrl: string }) {
   </div>
 }
 
+function ExcalidrawTab({ publicUrl }: { publicUrl: string }) {
+  const [embedUrl, setEmbedUrl] = useState('')
+  const [error, setError] = useState('')
+  const [ready, setReady] = useState(false)
+  const frameRef = useRef<HTMLIFrameElement>(null)
+  const connect = useCallback(async () => {
+    setError('')
+    setReady(false)
+    try {
+      const [health, ticket] = await Promise.all([fetchExcalidrawStatus(), fetchWorkspaceTicket('excalidraw')])
+      if (!health.available) throw new Error('Excalidraw ist noch nicht erreichbar.')
+      setEmbedUrl(`${new URL(publicUrl).origin}/workspace-login/excalidraw?ticket=${encodeURIComponent(ticket)}`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }, [publicUrl])
+  useEffect(() => { connect() }, [connect])
+  return <div className="embedded-app-shell excalidraw-workspace">
+    <div className="embedded-app-toolbar">
+      <div><strong>Excalidraw Whiteboard</strong><small>{ready ? 'Whiteboard ist bereit · lokal im Browser gespeichert' : 'Whiteboard wird verbunden…'}</small></div>
+      <div className="workspace-actions"><button className="secondary-btn" onClick={connect}><RefreshCw size={15} /> Neu verbinden</button><button className="primary-btn" onClick={() => frameRef.current?.requestFullscreen?.()} disabled={!embedUrl}><Maximize2 size={15} /> Vollbild</button></div>
+    </div>
+    {error && <div className="wissen-error"><AlertTriangle size={14} /> {error}</div>}
+    {embedUrl ? <iframe ref={frameRef} className="embedded-app-frame" src={embedUrl} title="Excalidraw Whiteboard" allow="fullscreen; clipboard-read; clipboard-write" onLoad={() => setReady(true)} /> : !error && <div className="embedded-loading"><Loader2 className="spin" /> Excalidraw wird verbunden…</div>}
+  </div>
+}
+
 export default function WissenView() {
   const { t } = useTheme()
   const [activeTab, setActiveTab] = useState<Tab>('navigation')
@@ -959,6 +986,7 @@ export default function WissenView() {
     if (activeTab === 'research' && !capabilities?.open_notebook.configured) setActiveTab('navigation')
     if (activeTab === 'slidev' && !capabilities?.slidev.configured) setActiveTab('navigation')
     if (activeTab === 'hyperframes' && !capabilities?.hyperframes?.configured) setActiveTab('navigation')
+    if (activeTab === 'excalidraw' && !capabilities?.excalidraw?.configured) setActiveTab('navigation')
   }, [activeTab, capabilities])
 
   const openNote = (path: string) => {
@@ -1002,6 +1030,9 @@ export default function WissenView() {
         {capabilities?.hyperframes?.configured && <button className={`tab-btn${activeTab === 'hyperframes' ? ' active' : ''}`} onClick={() => setActiveTab('hyperframes')}>
           <Clapperboard size={14} /> HyperFrames
         </button>}
+        {capabilities?.excalidraw?.configured && <button className={`tab-btn${activeTab === 'excalidraw' ? ' active' : ''}`} onClick={() => setActiveTab('excalidraw')}>
+          <PenTool size={14} /> Whiteboard
+        </button>}
       </div>
 
       <div className="wissen-tab-content">
@@ -1012,6 +1043,7 @@ export default function WissenView() {
         {activeTab === 'research' && <ResearchNotebooksTab />}
         {activeTab === 'slidev' && <SlidevTab publicUrl={capabilities?.slidev.public_url || ''} />}
         {activeTab === 'hyperframes' && <HyperframesTab publicUrl={capabilities?.hyperframes.public_url || ''} />}
+        {activeTab === 'excalidraw' && <ExcalidrawTab publicUrl={capabilities?.excalidraw.public_url || ''} />}
       </div>
 
       {floatingNote && (

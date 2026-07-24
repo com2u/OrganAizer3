@@ -41,6 +41,7 @@ VALID_TEMPLATE_KEYS = (
     "open_notebook",
     "slidev",
     "hyperframes",
+    "excalidraw",
     "mcp",
 )
 
@@ -85,7 +86,7 @@ def capabilities():
         rows = db.fetchall("SELECT DISTINCT template_key FROM verbindungen")
         added = {r["template_key"] for r in rows}
         result = {}
-        for key in ("open_notebook", "slidev", "hyperframes"):
+        for key in ("open_notebook", "slidev", "hyperframes", "excalidraw"):
             cfg = public_config(key)
             result[key] = {
                 "added": key in added,
@@ -105,7 +106,7 @@ def capabilities():
 
 @verbindungen_bp.route("/integrations/<key>", methods=["GET", "PUT"])
 def integration_settings(key: str):
-    if key not in ("open_notebook", "slidev", "hyperframes"):
+    if key not in ("open_notebook", "slidev", "hyperframes", "excalidraw"):
         return jsonify({"error": "Diese Integration wird hier nicht konfiguriert."}), 404
     if request.method == "GET":
         return jsonify(public_config(key))
@@ -114,6 +115,7 @@ def integration_settings(key: str):
         "open_notebook": {"enabled", "public_url", "api_url", "encryption_key", "password", "db_password"},
         "slidev": {"enabled", "public_url", "project_name"},
         "hyperframes": {"enabled", "public_url", "renderer_url", "project_name"},
+        "excalidraw": {"enabled", "public_url", "app_url"},
     }[key]
     clean = {k: v.strip() if isinstance(v, str) else v for k, v in data.items() if k in allowed}
     if "public_url" in clean and clean["public_url"] and not clean["public_url"].startswith(("http://", "https://")):

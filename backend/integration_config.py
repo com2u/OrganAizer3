@@ -73,4 +73,6 @@ def is_configured(key: str) -> bool:
         return bool(cfg.get("public_url"))
     if key == "hyperframes":
         return bool(cfg.get("public_url") and cfg.get("renderer_url"))
+    if key == "excalidraw":
+        return bool(cfg.get("public_url") and cfg.get("app_url"))
     return True

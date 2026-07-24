@@ -612,7 +612,7 @@ function PhonebookPanel({ t }: { t: (k: string) => string }) {
           </div>
           <textarea className="form-field phonebook-notes" value={draft.notes}
             onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
-            placeholder={t('telefonie.pb.notesPlaceholder')} rows={4} />
+            placeholder={t('telefonie.pb.notesPlaceholder')} rows={8} />
           <div className="phonebook-edit-actions">
             <button className="btn-primary" onClick={save} disabled={saving}>
               <Save size={14} /> {t('telefonie.pb.save')}

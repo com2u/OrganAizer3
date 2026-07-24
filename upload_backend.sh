@@ -124,6 +124,8 @@ python3 -c 'import json,os; p=\"data/integrations/slidev.json\"; old=json.load(o
 chmod 600 data/integrations/slidev.json
 python3 -c 'import json,os; p=\"data/integrations/hyperframes.json\"; old=json.load(open(p)) if os.path.exists(p) else {}; old.update({\"enabled\":True,\"public_url\":\"https://hyperframes.ai-server.org\",\"renderer_url\":\"http://hyperframes:3002\",\"project_name\":old.get(\"project_name\",\"default\")}); open(p,\"w\").write(json.dumps(old,ensure_ascii=False,indent=2)+\"\\n\")'
 chmod 600 data/integrations/hyperframes.json
+python3 -c 'import json,os; p=\"data/integrations/excalidraw.json\"; old=json.load(open(p)) if os.path.exists(p) else {}; old.update({\"enabled\":old.get(\"enabled\",True),\"public_url\":old.get(\"public_url\",\"https://excalidraw.ai-server.org\"),\"app_url\":old.get(\"app_url\",\"http://excalidraw:80\")}); open(p,\"w\").write(json.dumps(old,ensure_ascii=False,indent=2)+\"\\n\")'
+chmod 600 data/integrations/excalidraw.json
 sed -i '/^OPEN_NOTEBOOK_ENCRYPTION_KEY=/d;/^OPEN_NOTEBOOK_PASSWORD=/d;/^OPEN_NOTEBOOK_DB_PASSWORD=/d' .env
 [ -f data/slidev/slides.md ] || printf '%s\n' '---' 'theme: default' 'title: OrganAIzer Präsentation' '---' '' '# OrganAIzer Präsentation' '' 'Mit Markdown und Slidev erstellt.' > data/slidev/slides.md
 mkdir -p data/slidev/projects
@@ -138,6 +140,7 @@ docker compose build organaizer
 docker compose build voice-agent
 docker compose build slidev
 docker compose build hyperframes
+docker compose pull excalidraw
 docker compose up -d --no-build
 # Keep the existing Nginx Proxy Manager connected to the private stack so the
 # Open Notebook HTTPS host can reach UI and API without publishing host ports.
@@ -161,6 +164,13 @@ if docker container inspect nginxreverse-app-1 >/dev/null 2>&1; then
         docker exec nginxreverse-app-1 certbot certonly --webroot -w /data/letsencrypt-acme-challenge --agree-tos --register-unsafely-without-email -d hyperframes.ai-server.org
     fi
     docker cp deploy/nginx/hyperframes.conf nginxreverse-app-1:/data/nginx/proxy_host/90.conf
+    if ! docker exec nginxreverse-app-1 test -f /etc/letsencrypt/live/excalidraw.ai-server.org/fullchain.pem; then
+        docker cp deploy/nginx/excalidraw-http.conf nginxreverse-app-1:/data/nginx/proxy_host/91.conf
+        docker exec nginxreverse-app-1 nginx -t
+        docker exec nginxreverse-app-1 nginx -s reload
+        docker exec nginxreverse-app-1 certbot certonly --webroot -w /data/letsencrypt-acme-challenge --agree-tos --register-unsafely-without-email -d excalidraw.ai-server.org
+    fi
+    docker cp deploy/nginx/excalidraw.conf nginxreverse-app-1:/data/nginx/proxy_host/91.conf
     docker exec nginxreverse-app-1 nginx -t
     docker exec nginxreverse-app-1 nginx -s reload
 fi

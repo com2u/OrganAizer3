@@ -1010,6 +1010,8 @@ const T: Translations = {
   'vb.tpl.slidev.desc': { de: 'Markdown-Präsentationen erstellen', en: 'Create Markdown presentations' },
   'vb.tpl.hyperframes': { de: 'HyperFrames', en: 'HyperFrames' },
   'vb.tpl.hyperframes.desc': { de: 'HTML-Videos gestalten, prüfen und rendern', en: 'Create, inspect and render HTML videos' },
+  'vb.tpl.excalidraw': { de: 'Excalidraw', en: 'Excalidraw' },
+  'vb.tpl.excalidraw.desc': { de: 'Diagramme und Skizzen auf einem freien Whiteboard', en: 'Create diagrams and sketches on an open whiteboard' },
   'vb.tpl.mcp': { de: 'MCP', en: 'MCP' },
   'vb.tpl.mcp.desc': { de: 'Model Context Protocol', en: 'Model Context Protocol' },
 

@@ -14,6 +14,7 @@ from backend.api.obsidian_routes import obsidian_bp
 from backend.api.open_notebook_routes import open_notebook_bp
 from backend.api.slidev_routes import slidev_bp
 from backend.api.hyperframes_routes import hyperframes_bp
+from backend.api.excalidraw_routes import excalidraw_bp
 from backend.api.workspace_auth_routes import workspace_auth_bp
 from backend.api.verbindungen_routes import verbindungen_bp
 from backend.api.n8n_routes import n8n_bp
@@ -59,6 +60,7 @@ def create_app() -> Flask:
     app.register_blueprint(open_notebook_bp, url_prefix="/api/open-notebook")
     app.register_blueprint(slidev_bp, url_prefix="/api/slidev")
     app.register_blueprint(hyperframes_bp, url_prefix="/api/hyperframes")
+    app.register_blueprint(excalidraw_bp, url_prefix="/api/excalidraw")
     app.register_blueprint(workspace_auth_bp, url_prefix="/api/workspace-auth")
     app.register_blueprint(verbindungen_bp, url_prefix="/api/verbindungen")
     app.register_blueprint(n8n_bp, url_prefix="/api/n8n")
