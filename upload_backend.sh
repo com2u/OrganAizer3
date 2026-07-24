@@ -63,8 +63,11 @@ EXCLUDES=(
     ".venv"
     "node_modules"
     "frontend/dist"
+    "frontend/playwright-report"
+    "frontend/test-results"
     "__pycache__"
     ".ruff_cache"
+    ".~lock.*#"
 )
 
 # --- Upload project ---
@@ -102,7 +105,7 @@ $SSH "set -e
 cd $REMOTE_DIR
 # Migrate legacy Open Notebook values from the root .env into its private,
 # persisted integration configuration. The root .env no longer owns them.
-mkdir -p data/integrations data/slidev
+mkdir -p data/integrations data/slidev data/hyperframes/projects data/hyperframes/assets data/hyperframes/output
 ON_ENC=\$(sed -n 's/^OPEN_NOTEBOOK_ENCRYPTION_KEY=//p' .env | tail -1)
 ON_PASS=\$(sed -n 's/^OPEN_NOTEBOOK_PASSWORD=//p' .env | tail -1)
 ON_DB=\$(sed -n 's/^OPEN_NOTEBOOK_DB_PASSWORD=//p' .env | tail -1)
@@ -119,11 +122,16 @@ python3 -c 'import json,os; p=\"data/integrations/open_notebook.json\"; old=json
 chmod 600 data/integrations/open_notebook.json
 python3 -c 'import json,os; p=\"data/integrations/slidev.json\"; old=json.load(open(p)) if os.path.exists(p) else {}; old.update({\"enabled\":True,\"public_url\":\"https://open-notebook.ai-server.org/slidev/\",\"project_name\":old.get(\"project_name\",\"OrganAIzer Präsentation\")}); open(p,\"w\").write(json.dumps(old,ensure_ascii=False,indent=2)+\"\\n\")'
 chmod 600 data/integrations/slidev.json
+python3 -c 'import json,os; p=\"data/integrations/hyperframes.json\"; old=json.load(open(p)) if os.path.exists(p) else {}; old.update({\"enabled\":True,\"public_url\":\"https://hyperframes.ai-server.org\",\"renderer_url\":\"http://hyperframes:3002\",\"project_name\":old.get(\"project_name\",\"default\")}); open(p,\"w\").write(json.dumps(old,ensure_ascii=False,indent=2)+\"\\n\")'
+chmod 600 data/integrations/hyperframes.json
 sed -i '/^OPEN_NOTEBOOK_ENCRYPTION_KEY=/d;/^OPEN_NOTEBOOK_PASSWORD=/d;/^OPEN_NOTEBOOK_DB_PASSWORD=/d' .env
 [ -f data/slidev/slides.md ] || printf '%s\n' '---' 'theme: default' 'title: OrganAIzer Präsentation' '---' '' '# OrganAIzer Präsentation' '' 'Mit Markdown und Slidev erstellt.' > data/slidev/slides.md
 # This host also runs the voice and research stack. Sequential builds avoid
 # memory pressure from building the React and Slidev images at the same time.
-COMPOSE_PARALLEL_LIMIT=1 docker compose build
+docker compose build organaizer
+docker compose build voice-agent
+docker compose build slidev
+docker compose build hyperframes
 docker compose up -d --no-build
 # Keep the existing Nginx Proxy Manager connected to the private stack so the
 # Open Notebook HTTPS host can reach UI and API without publishing host ports.
@@ -135,6 +143,13 @@ if docker container inspect nginxreverse-app-1 >/dev/null 2>&1; then
     if [ -n \"\$PROXY_CONF\" ] && ! docker exec nginxreverse-app-1 grep -q 'open-notebook-workspaces.conf' \"\$PROXY_CONF\"; then
         docker exec nginxreverse-app-1 sed -i '/# Custom/i\\  include /data/nginx/custom/open-notebook-workspaces.conf;' \"\$PROXY_CONF\"
     fi
+    if ! docker exec nginxreverse-app-1 test -f /etc/letsencrypt/live/hyperframes.ai-server.org/fullchain.pem; then
+        docker cp deploy/nginx/hyperframes-http.conf nginxreverse-app-1:/data/nginx/proxy_host/90.conf
+        docker exec nginxreverse-app-1 nginx -t
+        docker exec nginxreverse-app-1 nginx -s reload
+        docker exec nginxreverse-app-1 certbot certonly --webroot -w /data/letsencrypt-acme-challenge --agree-tos --register-unsafely-without-email -d hyperframes.ai-server.org
+    fi
+    docker cp deploy/nginx/hyperframes.conf nginxreverse-app-1:/data/nginx/proxy_host/90.conf
     docker exec nginxreverse-app-1 nginx -t
     docker exec nginxreverse-app-1 nginx -s reload
 fi

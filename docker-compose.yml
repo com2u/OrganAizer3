@@ -121,6 +121,28 @@ services:
     ports:
       - "127.0.0.1:${SLIDEV_PORT:-3030}:3030"
 
+  # ===== HyperFrames – HTML video studio and renderer =====
+  hyperframes:
+    build:
+      context: ./hyperframes
+    image: organaizer-hyperframes:0.7.70
+    container_name: organaizer-hyperframes
+    restart: unless-stopped
+    environment:
+      HYPERFRAMES_PROJECT: ${HYPERFRAMES_PROJECT:-default}
+    volumes:
+      - ./data/hyperframes/projects:/data/hyperframes/projects
+      - ./data/hyperframes/assets:/data/hyperframes/assets
+      - ./data/hyperframes/output:/data/hyperframes/output
+    ports:
+      - "127.0.0.1:${HYPERFRAMES_PORT:-3004}:3002"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
 
   # ===== n8n – Workflow Automation =====
   # Local n8n instance for the OrganAIzer n8n integration.

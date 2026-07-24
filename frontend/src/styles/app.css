@@ -4820,8 +4820,12 @@ button { font-family: inherit; }
 }
 
 /* ===== Verbindungen View ===== */
-.integration-config-modal { width: min(680px, calc(100vw - 32px)); }
+.resource-modal-layer { position: fixed; inset: 0; z-index: 1090; }
+.integration-config-modal { width: min(680px, calc(100vw - 32px)); color: var(--text-primary); }
 .integration-config-modal .form-grid { display: grid; gap: 14px; }
+.integration-config-modal .modal-header { margin-bottom: 18px; }
+.integration-config-modal .modal-header p, .integration-volume-hint { color: var(--text-secondary); }
+.integration-volume-hint { grid-column: 1 / -1; margin: 0; font-size: 12px; }
 .checkbox-field { flex-direction: row !important; align-items: center; gap: 8px; }
 .slidev-workspace, .embedded-app-shell { min-height: 640px; display: flex; flex-direction: column; gap: 12px; }
 .slidev-toolbar, .embedded-app-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }

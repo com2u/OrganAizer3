@@ -593,7 +593,7 @@ function PhonebookPanel({ t }: { t: (k: string) => string }) {
       {error && <div className="telefonie-alert error"><AlertTriangle size={16} /> {error}</div>}
 
       {editing !== null && (
-        <div className="modal-overlay phonebook-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="phonebook-dialog-title">
+        <div className="resource-modal-layer phonebook-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="phonebook-dialog-title">
           <div className="phonebook-edit resource-edit-modal">
           <div className="modal-title-row">
             <h2 id="phonebook-dialog-title">{editing ? t('telefonie.pb.edit') : t('telefonie.pb.add')}</h2>

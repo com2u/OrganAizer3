@@ -8,7 +8,7 @@
 
 ---
 
-## Version: 0.1.17 (July 2026)
+## Version: 0.1.18 (July 2026)
 
 ### Research notebooks (Open Notebook)
 
@@ -39,9 +39,18 @@ Configured n8n and Slidev connections likewise expose optional workspaces:
 provides a Markdown editor, live Slidev presentation, external launch and
 fullscreen mode.
 
-The public Slidev route is protected with HTTP Basic Authentication (user
-`organaizer`, password: the locally configured Open Notebook access key). n8n
-retains its own login. Both direct container ports bind to localhost only.
+Slidev opens without a second login. OrganAIzer issues a short-lived signed
+ticket and exchanges it for an HttpOnly, partitioned workspace cookie at the
+reverse proxy. No integration password is embedded in the browser.
+
+### HyperFrames
+
+HyperFrames 0.7.70 runs as a dedicated Node 22 renderer container with Chromium
+and FFmpeg. A configured external connection exposes **Knowledge →
+HyperFrames**, where the complete Studio is embedded with the same automatic
+ticket authentication as Slidev. Persistent mounts are
+`data/hyperframes/projects`, `data/hyperframes/assets`, and
+`data/hyperframes/output`; direct renderer ports bind to localhost.
 
 ## Feature Overview
 

@@ -71,4 +71,6 @@ def is_configured(key: str) -> bool:
         return all(cfg.get(k) for k in ("public_url", "password", "encryption_key", "db_password"))
     if key == "slidev":
         return bool(cfg.get("public_url"))
+    if key == "hyperframes":
+        return bool(cfg.get("public_url") and cfg.get("renderer_url"))
     return True

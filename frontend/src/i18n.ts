@@ -1008,6 +1008,8 @@ const T: Translations = {
   'vb.tpl.openNotebook.desc': { de: 'Recherche, Sammlungen und Podcasts', en: 'Research, collections and podcasts' },
   'vb.tpl.slidev': { de: 'Slidev', en: 'Slidev' },
   'vb.tpl.slidev.desc': { de: 'Markdown-Präsentationen erstellen', en: 'Create Markdown presentations' },
+  'vb.tpl.hyperframes': { de: 'HyperFrames', en: 'HyperFrames' },
+  'vb.tpl.hyperframes.desc': { de: 'HTML-Videos gestalten, prüfen und rendern', en: 'Create, inspect and render HTML videos' },
   'vb.tpl.mcp': { de: 'MCP', en: 'MCP' },
   'vb.tpl.mcp.desc': { de: 'Model Context Protocol', en: 'Model Context Protocol' },
 

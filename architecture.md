@@ -13,12 +13,18 @@ flowchart LR
   CAP --> T[Tasks tabs]
   W --> ON[Open Notebook]
   W --> SL[Slidev editor and presentation]
+  W --> HF[HyperFrames Studio and renderer]
   T --> N[n8n]
 ```
 
 Secrets and Slidev projects live in the persistent `data/` mount.
 `backend/integration_config.py` writes local configuration atomically with
 owner-only permissions and removes secret values from API responses.
+
+Slidev and HyperFrames use the `workspace_auth_routes.py` ticket exchange:
+the authenticated SPA requests a short-lived signed ticket, the external HTTPS
+host exchanges it for an HttpOnly partitioned cookie, and Nginx `auth_request`
+checks that cookie for HTML, assets, and WebSocket upgrades.
 
 ## Open Notebook integration
 
@@ -124,6 +130,7 @@ OrganAizer3/
 ├── Dockerfile                      # Builds the React bundle and Flask production image.
 ├── docker-compose.yml              # Defines the application, Supabase, external workspaces, and voice stack.
 ├── slidev/                          # Builds the isolated Slidev presentation service.
+├── hyperframes/                     # Builds the Node 22, Chromium, and FFmpeg renderer/studio service.
 ├── docker-entrypoint.sh            # Starts Flask and performs only the safe SQLite first-run import.
 ├── requirements.txt                # Declares Python dependencies for the main backend.
 ├── schedule.xlsx                   # Supplies the initial schedule for a new SQLite installation.
@@ -141,6 +148,7 @@ OrganAizer3/
 │   ├── main.py                     # Provides command-line schedule import and export operations.
 │   ├── config.py                   # Loads environment variables and resolves runtime paths and service settings.
 │   ├── integration_config.py       # Persists and redacts local external-integration settings.
+│   ├── workspace_tokens.py         # Signs and validates expiring iframe workspace grants.
 │   ├── auth.py                     # Integrates OpenWebUI authentication and protects API requests.
 │   ├── api/
 │   │   ├── __init__.py             # Marks the API route collection as a package.
@@ -154,6 +162,8 @@ OrganAizer3/
 │   │   ├── n8n_routes.py           # Manages n8n settings and workflow integration access.
 │   │   ├── open_notebook_routes.py # Bridges authenticated Open Notebook requests.
 │   │   ├── slidev_routes.py        # Loads and saves the persistent Slidev Markdown project.
+│   │   ├── hyperframes_routes.py    # Exposes the authenticated renderer readiness check.
+│   │   ├── workspace_auth_routes.py # Exchanges SPA tickets for secure iframe cookies.
 │   │   ├── access_requests_routes.py # Accepts rate-limited public access requests.
 │   │   └── logging_middleware.py   # Records structured API request diagnostics.
 │   ├── db/

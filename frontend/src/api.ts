@@ -798,13 +798,13 @@ export async function deleteVerbindung(id: number): Promise<void> {
   if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || 'Failed to delete connection') }
 }
 
-export type IntegrationKey = 'open_notebook' | 'slidev'
+export type IntegrationKey = 'open_notebook' | 'slidev' | 'hyperframes'
 export interface IntegrationCapability {
   added: boolean
   configured: boolean
   public_url: string
 }
-export type IntegrationCapabilities = Record<'open_notebook' | 'slidev' | 'n8n', IntegrationCapability>
+export type IntegrationCapabilities = Record<'open_notebook' | 'slidev' | 'hyperframes' | 'n8n', IntegrationCapability>
 
 export async function fetchIntegrationCapabilities(): Promise<IntegrationCapabilities> {
   const res = await apiFetch('/verbindungen/capabilities')
@@ -845,6 +845,19 @@ export async function saveSlidevProject(content: string): Promise<void> {
     const data = await res.json().catch(() => ({}))
     throw new Error(data.error || 'Slidev-Projekt konnte nicht gespeichert werden')
   }
+}
+
+export async function fetchWorkspaceTicket(target: 'slidev' | 'hyperframes'): Promise<string> {
+  const res = await apiFetch(`/workspace-auth/ticket/${target}`)
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Workspace-Zugang konnte nicht erstellt werden')
+  return data.ticket
+}
+
+export async function fetchHyperframesStatus(): Promise<{ available: boolean; version: string }> {
+  const res = await apiFetch('/hyperframes/status')
+  if (!res.ok) throw new Error('HyperFrames-Status konnte nicht geladen werden')
+  return res.json()
 }
 
 // ===== n8n Integration =====

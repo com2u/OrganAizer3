@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback, KeyboardEvent } from 'react'
+import { useState, useEffect, useCallback, useRef, KeyboardEvent } from 'react'
 import MDEditor from '@uiw/react-md-editor'
 import { useTheme } from '../ThemeContext'
 import {
   Search, Clock, Tag, Loader2, FolderOpen, ChevronRight, ChevronDown,
   File, Folder, RefreshCw, Save, AlertTriangle, ArrowUpDown, ArrowUp, ArrowDown,
   LibraryBig, Plus, ExternalLink, ShieldCheck, Sparkles, KeyRound, Check,
-  Presentation, Maximize2,
+  Presentation, Maximize2, Clapperboard,
 } from 'lucide-react'
 import {
   fetchObsidianTree, searchObsidian, fetchObsidianTags, fetchObsidianRecent,
@@ -15,9 +15,10 @@ import {
   fetchOpenNotebookStatus, fetchOpenNotebookAccess, fetchResearchNotebooks, createResearchNotebook,
   OpenNotebookStatus, ResearchNotebook,
   fetchIntegrationCapabilities, IntegrationCapabilities, fetchSlidevProject, saveSlidevProject,
+  fetchWorkspaceTicket, fetchHyperframesStatus,
 } from '../api'
 
-type Tab = 'search' | 'navigation' | 'tags' | 'recent' | 'research' | 'slidev'
+type Tab = 'search' | 'navigation' | 'tags' | 'recent' | 'research' | 'slidev' | 'hyperframes'
 
 // ── Editor ────────────────────────────────────────────────────────────────────
 
@@ -749,6 +750,7 @@ function SlidevTab({ publicUrl }: { publicUrl: string }) {
   const [mode, setMode] = useState<'editor' | 'presentation'>('editor')
   const [content, setContent] = useState('')
   const [message, setMessage] = useState('')
+  const [embedUrl, setEmbedUrl] = useState('')
   const frame = useCallback((node: HTMLIFrameElement | null) => { (window as unknown as { __slidevFrame?: HTMLIFrameElement }).__slidevFrame = node || undefined }, [])
   useEffect(() => {
     fetchSlidevProject().then(r => setContent(r.content)).catch(e => setMessage(e.message))
@@ -762,16 +764,53 @@ function SlidevTab({ publicUrl }: { publicUrl: string }) {
     const el = (window as unknown as { __slidevFrame?: HTMLIFrameElement }).__slidevFrame
     el?.requestFullscreen?.()
   }
+  const openPresentation = async () => {
+    setMode('presentation')
+    setMessage('Sicherer Präsentationszugang wird vorbereitet…')
+    try {
+      const ticket = await fetchWorkspaceTicket('slidev')
+      setEmbedUrl(`${new URL(publicUrl).origin}/workspace-login/slidev?ticket=${encodeURIComponent(ticket)}`)
+      setMessage('')
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : String(e))
+    }
+  }
   return <div className="slidev-workspace">
     <div className="slidev-toolbar">
-      <div className="segmented"><button className={mode === 'editor' ? 'active' : ''} onClick={() => setMode('editor')}>Markdown bearbeiten</button><button className={mode === 'presentation' ? 'active' : ''} onClick={() => setMode('presentation')}>Präsentation</button></div>
-      {mode === 'editor' ? <button className="primary-btn" onClick={save}><Save size={15} /> Speichern</button> : <><a className="secondary-btn" href={publicUrl} target="_blank" rel="noreferrer"><ExternalLink size={15} /> Neues Fenster</a><button className="primary-btn" onClick={fullscreen}><Maximize2 size={15} /> Vollbild</button></>}
+      <div className="segmented"><button className={mode === 'editor' ? 'active' : ''} onClick={() => setMode('editor')}>Markdown bearbeiten</button><button className={mode === 'presentation' ? 'active' : ''} onClick={openPresentation}>Präsentation</button></div>
+      {mode === 'editor' ? <button className="primary-btn" onClick={save}><Save size={15} /> Speichern</button> : <><button className="secondary-btn" onClick={openPresentation}><RefreshCw size={15} /> Neu verbinden</button><button className="primary-btn" onClick={fullscreen}><Maximize2 size={15} /> Vollbild</button></>}
     </div>
     {message && <p className="slidev-message">{message}</p>}
-    {mode === 'presentation' && <p className="slidev-message">Geschützter Präsentationszugang: Benutzer <strong>organaizer</strong>, Passwort ist der Open-Notebook-Zugangsschlüssel.</p>}
     {mode === 'editor'
       ? <div data-color-mode={theme === 'dark' ? 'dark' : 'light'}><MDEditor value={content} onChange={v => setContent(v || '')} height={620} preview="live" /></div>
-      : <iframe ref={frame} className="slidev-frame" src={publicUrl} title="Slidev Präsentation" allow="fullscreen" />}
+      : embedUrl ? <iframe ref={frame} className="slidev-frame" src={embedUrl} title="Slidev Präsentation" allow="fullscreen" /> : <div className="embedded-loading"><Loader2 className="spin" /> Verbindung wird vorbereitet…</div>}
+  </div>
+}
+
+function HyperframesTab({ publicUrl }: { publicUrl: string }) {
+  const [embedUrl, setEmbedUrl] = useState('')
+  const [status, setStatus] = useState<{ available: boolean; version: string } | null>(null)
+  const [error, setError] = useState('')
+  const frameRef = useRef<HTMLIFrameElement>(null)
+  const connect = useCallback(async () => {
+    setError('')
+    try {
+      const [health, ticket] = await Promise.all([fetchHyperframesStatus(), fetchWorkspaceTicket('hyperframes')])
+      setStatus(health)
+      if (!health.available) throw new Error('Der HyperFrames-Renderer ist noch nicht erreichbar.')
+      setEmbedUrl(`${new URL(publicUrl).origin}/workspace-login/hyperframes?ticket=${encodeURIComponent(ticket)}`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }, [publicUrl])
+  useEffect(() => { connect() }, [connect])
+  return <div className="embedded-app-shell hyperframes-workspace">
+    <div className="embedded-app-toolbar">
+      <div><strong>HyperFrames Studio</strong><small>{status?.available ? `Renderer ${status.version} ist bereit` : 'Renderer wird geprüft…'}</small></div>
+      <div className="workspace-actions"><button className="secondary-btn" onClick={connect}><RefreshCw size={15} /> Neu verbinden</button><button className="primary-btn" onClick={() => frameRef.current?.requestFullscreen?.()} disabled={!embedUrl}><Maximize2 size={15} /> Vollbild</button></div>
+    </div>
+    {error && <div className="wissen-error"><AlertTriangle size={14} /> {error}</div>}
+    {embedUrl ? <iframe ref={frameRef} className="embedded-app-frame" src={embedUrl} title="HyperFrames Studio" allow="fullscreen; clipboard-read; clipboard-write" /> : !error && <div className="embedded-loading"><Loader2 className="spin" /> HyperFrames wird verbunden…</div>}
   </div>
 }
 
@@ -784,6 +823,7 @@ export default function WissenView() {
   useEffect(() => {
     if (activeTab === 'research' && !capabilities?.open_notebook.configured) setActiveTab('navigation')
     if (activeTab === 'slidev' && !capabilities?.slidev.configured) setActiveTab('navigation')
+    if (activeTab === 'hyperframes' && !capabilities?.hyperframes?.configured) setActiveTab('navigation')
   }, [activeTab, capabilities])
 
   const openNote = (path: string) => {
@@ -824,6 +864,9 @@ export default function WissenView() {
         {capabilities?.slidev.configured && <button className={`tab-btn${activeTab === 'slidev' ? ' active' : ''}`} onClick={() => setActiveTab('slidev')}>
           <Presentation size={14} /> Präsentationen
         </button>}
+        {capabilities?.hyperframes?.configured && <button className={`tab-btn${activeTab === 'hyperframes' ? ' active' : ''}`} onClick={() => setActiveTab('hyperframes')}>
+          <Clapperboard size={14} /> HyperFrames
+        </button>}
       </div>
 
       <div className="wissen-tab-content">
@@ -833,6 +876,7 @@ export default function WissenView() {
         {activeTab === 'recent' && <RecentTab onOpenNote={openNote} />}
         {activeTab === 'research' && <ResearchNotebooksTab />}
         {activeTab === 'slidev' && <SlidevTab publicUrl={capabilities?.slidev.public_url || ''} />}
+        {activeTab === 'hyperframes' && <HyperframesTab publicUrl={capabilities?.hyperframes.public_url || ''} />}
       </div>
 
       {floatingNote && (

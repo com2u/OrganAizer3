@@ -1,6 +1,6 @@
 # Terminlandschaft - Requirements
 
-## Configurable external workspaces (0.1.17)
+## Configurable external workspaces (0.1.18)
 
 - Open Notebook, n8n, and Slidev tabs appear only when their external
   connection exists and is actively configured.
@@ -9,6 +9,13 @@
 - Slidev provides a persistent Markdown editor plus embedded presentation,
   separate-window, and browser-fullscreen modes.
 - Backend uploads preserve all integration settings and project data.
+- Slidev and HyperFrames iframe sessions use automatically issued, signed,
+  short-lived tickets and HttpOnly partitioned cookies instead of an extra
+  browser login prompt.
+- HyperFrames runs in an independent Node 22 container with Chromium and FFmpeg;
+  project, asset, and render-output volumes persist below `data/hyperframes/`.
+- Integration and phonebook dialogs use the same opaque resource-modal surface,
+  spacing, shadow, backdrop, and theme behavior.
 
 ## Open Notebook integration (0.1.15)
 
